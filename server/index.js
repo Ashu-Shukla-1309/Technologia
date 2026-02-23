@@ -74,8 +74,17 @@ const Otp = mongoose.model('Otp', new mongoose.Schema({
 }));
 
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS }
+  host: 'smtp.gmail.com',
+  port: 465,
+  secure: true, // Use SSL/TLS
+  auth: { 
+    user: process.env.EMAIL_USER, 
+    pass: process.env.EMAIL_PASS 
+  },
+  tls: {
+    // This tells Render's internal network proxy not to block the SSL certificate
+    rejectUnauthorized: false 
+  }
 });
 
 app.use('/api/auth/', authLimiter);
