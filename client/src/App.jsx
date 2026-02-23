@@ -62,11 +62,11 @@ function App() {
   };
 
   const logout = () => {
-    // Only remove auth data, leave the addresses alone!
+    // Only remove the auth keys, leave savedAddresses alone!
     localStorage.removeItem('token');
     localStorage.removeItem('userEmail');
     localStorage.removeItem('isAdmin');
-    
+
     setToken(null);
     setIsAdmin(false);
     window.location.href = "/";
