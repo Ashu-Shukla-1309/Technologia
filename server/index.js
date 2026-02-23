@@ -91,18 +91,12 @@ app.post('/api/auth/register', async (req, res) => {
     if (password.length < 6) return res.status(400).json({ error: "Password too short" });
     
     let user = await User.findOne({ email });
-    
     if (user) {
-      // If user is already fully verified, stop them.
-      if (user.isVerified) {
-        return res.status(400).json({ error: "Email already registered" });
-      }
-      // GHOST ACCOUNT FIX: Update password and prepare to resend OTP
+      if (user.isVerified) return res.status(400).json({ error: "Email already registered" });
       const salt = await bcrypt.genSalt(10);
       user.password = await bcrypt.hash(password, salt);
       await user.save();
     } else {
-      // Completely new user
       const salt = await bcrypt.genSalt(10);
       const hashedPassword = await bcrypt.hash(password, salt);
       user = new User({ email, password: hashedPassword });
@@ -112,16 +106,15 @@ app.post('/api/auth/register', async (req, res) => {
     const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
     await Otp.findOneAndUpdate({ email }, { code: verificationCode }, { upsert: true, returnDocument: 'after' });
 
-    await transporter.sendMail({
-      from: process.env.EMAIL_USER,
-      to: email,
-      subject: "Welcome! Your Verification Code",
-      html: `<h2>Welcome to Technologia</h2><p>Your verification code is: <b style="font-size: 24px;">${verificationCode}</b></p>`
-    });
+    // 🚀 THE HACK: Print to Render logs instead of fighting the firewall
+    console.log(`\n=========================================`);
+    console.log(`📧 MOCK EMAIL SENT TO: ${email}`);
+    console.log(`🔐 OTP CODE IS: ${verificationCode}`);
+    console.log(`=========================================\n`);
 
-    res.json({ message: "User registered successfully & code sent!" });
+    res.json({ message: "Verification code generated! Check Render Logs." });
   } catch (err) {
-    console.error("🚨 EMAIL/REGISTER CRASH:", err); // 👈 CRASH LOGGING
+    console.error("🚨 REGISTER CRASH:", err);
     res.status(500).json({ error: "Registration failed" });
   }
 });
