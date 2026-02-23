@@ -167,8 +167,7 @@ You need to run both the Node.js server and the Vite React app simultaneously. O
 
 
 cd server
-npm start
-# or 'node index.js' / 'nodemon index.js'
+npx node index.js or npx nodemon index.js
 # You should see: "Server running on port 5000" and "MongoDB Connected"
 
 
