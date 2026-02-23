@@ -75,15 +75,11 @@ const Otp = mongoose.model('Otp', new mongoose.Schema({
 
 const transporter = nodemailer.createTransport({
   host: 'smtp.gmail.com',
-  port: 465,
-  secure: true, // Use SSL/TLS
+  port: 587, // 👈 Changed from 465 to 587
+  secure: false, // 👈 Must be false for 587 (it upgrades to secure via STARTTLS)
   auth: { 
     user: process.env.EMAIL_USER, 
     pass: process.env.EMAIL_PASS 
-  },
-  tls: {
-    // This tells Render's internal network proxy not to block the SSL certificate
-    rejectUnauthorized: false 
   }
 });
 
