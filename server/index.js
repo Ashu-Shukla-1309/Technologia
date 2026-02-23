@@ -9,18 +9,20 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 
 const app = express();
+
+// 🚀 CRITICAL PROXY FIX: Must be before helmet and rate limiter
 app.set('trust proxy', 1);
 
 app.use(helmet()); 
 
-// 🚀 DEPLOYMENT UPDATE 1: Dynamic CORS 
-// It will use your live Vercel URL if available, otherwise defaults to localhost for testing.
+// 🚀 DEPLOYMENT UPDATE: Dynamic CORS 
 const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
 app.use(cors({ origin: clientUrl, credentials: true })); 
 
 app.use(express.json({ limit: '10kb' })); 
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 
+// Custom Input Sanitizer
 app.use((req, res, next) => {
   const sanitize = (obj) => {
     if (obj instanceof Object) {
@@ -83,13 +85,24 @@ app.post('/api/auth/register', async (req, res) => {
     const { email, password } = req.body;
     if (password.length < 6) return res.status(400).json({ error: "Password too short" });
     
-    const existingUser = await User.findOne({ email });
-    if (existingUser) return res.status(400).json({ error: "Email already registered" });
-
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-    const newUser = new User({ email, password: hashedPassword });
-    await newUser.save();
+    let user = await User.findOne({ email });
+    
+    if (user) {
+      // If user is already fully verified, stop them.
+      if (user.isVerified) {
+        return res.status(400).json({ error: "Email already registered" });
+      }
+      // GHOST ACCOUNT FIX: Update password and prepare to resend OTP
+      const salt = await bcrypt.genSalt(10);
+      user.password = await bcrypt.hash(password, salt);
+      await user.save();
+    } else {
+      // Completely new user
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash(password, salt);
+      user = new User({ email, password: hashedPassword });
+      await user.save();
+    }
 
     const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
     await Otp.findOneAndUpdate({ email }, { code: verificationCode }, { upsert: true, returnDocument: 'after' });
@@ -98,7 +111,7 @@ app.post('/api/auth/register', async (req, res) => {
       from: process.env.EMAIL_USER,
       to: email,
       subject: "Welcome! Your Verification Code",
-      html: `<h2>Welcome to Technologia</h2><p>Your verification code is: <b>${verificationCode}</b></p>`
+      html: `<h2>Welcome to Technologia</h2><p>Your verification code is: <b style="font-size: 24px;">${verificationCode}</b></p>`
     });
 
     res.json({ message: "User registered successfully & code sent!" });
@@ -176,13 +189,16 @@ app.post('/api/auth/login', async (req, res) => {
     const user = await User.findOne({ email });
     if (!user) return res.status(400).json({ error: "User not found" });
     
-    // 👈 BLOCK UNVERIFIED USERS
-    if (!user.isVerified) return res.status(403).json({ error: "Please verify your email with the OTP first!" });
+    const isAdmin = email === process.env.ADMIN_EMAIL;
+
+    // 👈 BLOCK UNVERIFIED USERS (Admin Bypass)
+    if (!user.isVerified && !isAdmin) {
+      return res.status(403).json({ error: "Please verify your email with the OTP first!" });
+    }
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(400).json({ error: "Wrong password" });
     
-    const isAdmin = email === process.env.ADMIN_EMAIL;
     const token = jwt.sign({ id: user._id, isAdmin }, process.env.JWT_SECRET, { expiresIn: '2h' });
     res.json({ token, email: user.email, isAdmin });
   } catch (err) {
@@ -234,7 +250,7 @@ app.post('/api/orders', async (req, res) => {
       `
     };
 
-    transporter.sendMail(mailOptions, (err) => { if (err) console.log("🚨 EMAIL/ORDER CRASH:", err); });
+    transporter.sendMail(mailOptions, (err) => { if (err) console.error("🚨 EMAIL/ORDER CRASH:", err); });
     res.json(newOrder);
   } catch (err) {
     res.status(500).json({ error: "Order failed" });
@@ -268,7 +284,7 @@ app.delete('/api/orders/:id', async (req, res) => {
           `
         };
 
-        transporter.sendMail(mailOptions, (err) => { if (err) console.log("🚨 EMAIL/CANCEL CRASH:", err); });
+        transporter.sendMail(mailOptions, (err) => { if (err) console.error("🚨 EMAIL/CANCEL CRASH:", err); });
 
         res.json({ message: "Order cancelled successfully" });
     } catch (err) {
