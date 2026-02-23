@@ -22,7 +22,8 @@ function App() {
   const [isAdmin, setIsAdmin] = useState(localStorage.getItem('isAdmin') === 'true');
 
   const fetchProducts = () => {
-    axios.get('${import.meta.env.VITE_API_URL}/products')
+    
+    axios.get(`${import.meta.env.VITE_API_URL}/api/products`)
       .then(res => setProducts(res.data))
       .catch(err => console.error("Fetch Error:", err));
   };

@@ -53,7 +53,7 @@ const VerifyOTP = () => {
     if (finalOtp.length < 6) return alert("Please enter the full 6-digit code");
 
     try {
-      await axios.post('${import.meta.env.VITE_API_URL}/auth/verify-otp', { email, otp: finalOtp });
+      await axios.post(`${import.meta.env.VITE_API_URL}/api/auth/verify-otp`, { email, otp: finalOtp });
       alert("Technologia: Account Verified Successfully!");
       navigate('/login');
     } catch (err) {

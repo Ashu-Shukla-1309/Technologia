@@ -54,7 +54,7 @@ const ResetPassword = () => {
     if (finalOtp.length < 6) return alert("Please enter the full 6-digit code");
 
     try {
-      await axios.post('${import.meta.env.VITE_API_URL}/auth/reset-password', { 
+      await axios.post(`${import.meta.env.VITE_API_URL}/api/auth/reset-password`, { 
         email, otp: finalOtp, newPassword 
       });
       alert("Password Reset Successful! Please Login.");

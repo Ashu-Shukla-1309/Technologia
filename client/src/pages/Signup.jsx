@@ -10,7 +10,7 @@ const Signup = () => {
   const handleSignup = async (e) => {
     e.preventDefault();
     try {
-      await axios.post('${import.meta.env.VITE_API_URL}/auth/register', { email, password });
+      await axios.post(`${import.meta.env.VITE_API_URL}/api/auth/register`, { email, password });
       alert("Verification code sent to your email!");
       // Redirect to verification page and pass the email state
       navigate('/verify', { state: { email } });

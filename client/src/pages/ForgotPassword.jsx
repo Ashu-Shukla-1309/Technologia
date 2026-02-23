@@ -19,7 +19,7 @@ const ForgotPassword = () => {
     if (cooldown > 0) return;
     
     try {
-      await axios.post('${import.meta.env.VITE_API_URL}/auth/forgot-password', { email });
+      await axios.post(`${import.meta.env.VITE_API_URL}/api/auth/forgot-password`, { email });
       setCooldown(60); 
       alert("Reset code sent to your email!");
       navigate('/reset-password', { state: { email } });
