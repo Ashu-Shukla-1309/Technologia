@@ -62,7 +62,11 @@ function App() {
   };
 
   const logout = () => {
-    localStorage.clear();
+    // Only remove auth data, leave the addresses alone!
+    localStorage.removeItem('token');
+    localStorage.removeItem('userEmail');
+    localStorage.removeItem('isAdmin');
+    
     setToken(null);
     setIsAdmin(false);
     window.location.href = "/";
