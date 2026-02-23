@@ -1,117 +1,183 @@
-# 🤖 TECHNOLOGIA | Next-Gen E-Commerce
 
-![Technologia Banner](https://img.shields.io/badge/Status-Live-blue?style=for-the-badge) ![MERN Stack](https://img.shields.io/badge/Stack-MERN-success?style=for-the-badge) ![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)
+# Technologia 🚀 | Premium Tech Gadgets E-Commerce
 
-> **A futuristic, full-stack e-commerce platform featuring 3D animations, secure payments, and a high-performance backend.**
-
----
-
-## 🚀 Live Demo
-**[View Live Site](https://technologia.vercel.app)** *(Replace with your actual Vercel link)*
+Technologia is a full-stack, Single Page Application (SPA) designed to deliver a seamless, high-end e-commerce experience for premium tech gadgets. Built with the MERN stack and highly optimized for performance using Vite, this project features secure OTP authentication, an animated interactive UI, dynamic cart management, and a robust admin inventory system.
 
 ---
 
-## ✨ Key Features
-
-### 🎨 **Frontend (Futuristic UI)**
-- **Immersive Hero Section:** Video backgrounds with floating 3D elements and "Vortex" particle effects.
-- **Animations:** Smooth page transitions and scroll reveals using **Framer Motion**.
-- **Dynamic Text:** Auto-typing and rotating text effects.
-- **Responsive Design:** Fully optimized for Mobile, Tablet, and Desktop via **Tailwind CSS**.
-- **Shopping Cart:** Real-time state management for adding/removing items.
-
-### 🛡️ **Backend (The Fortress)**
-- **Secure Auth:** JWT (JSON Web Tokens) with Bcrypt password hashing.
-- **Admin Dashboard:** Special access to Add/Delete products and view all sales.
-- **Email Notifications:** Automated email alerts to Admin upon every new sale using **Nodemailer**.
-- **Security:** Protected against XSS, NoSQL Injection, and Spam with **Helmet**, **Rate Limiting**, and **Sanitization**.
-
-### 💾 **Database**
-- **MongoDB Atlas:** Cloud-hosted database for scalable product and user management.
+## 📑 Table of Contents
+- [Key Features](#key-features)
+- [Technology Stack](#tech-stack)
+- [Design System & Typography](#design-system)
+- [Page & Component Breakdown](#page-breakdown)
+- [Local Setup & Comprehensive Installation](#setup)
+  - [1. Prerequisites](#prerequisites)
+  - [2. Installation](#installation)
+  - [3. Backend Configuration (.env)](#backend-env)
+  - [4. Frontend Configuration (.env)](#frontend-env)
+  - [5. Running the Application](#running)
+- [Author](#author)
 
 ---
 
-## 🛠️ Tech Stack
+<a name="key-features"></a>
+## 🌟 Key Features
 
-| Component | Technology |
-| :--- | :--- |
-| **Frontend** | React.js, Vite, Tailwind CSS, Framer Motion |
-| **Backend** | Node.js, Express.js |
-| **Database** | MongoDB, Mongoose |
-| **Security** | Helmet, Bcrypt, JWT, Express-Rate-Limit |
-| **Tools** | Nodemailer, Axios, React Router |
+* **Secure Authentication Flow:** Email-based OTP verification for account creation and password resets.
+* **Dynamic Cart & Checkout:** Real-time cart calculations, quantity management, and a multi-address local storage book.
+* **Animated UI/UX:** Smooth page transitions, success/cancellation modals, and interactive hover states powered by Framer Motion.
+* **Visual Order Tracking:** A dynamic, step-by-step timeline tracking the shipment status of user orders.
+* **Integrated Payment UI:** Simulated secure checkout with options for Card, Cash on Delivery, and dynamic UPI QR code generation linked via environment variables.
+* **Admin Dashboard:** Full CRUD operations for managing the product inventory directly from the frontend (Protected Route).
+
+<a name="tech-stack"></a>
+## 🛠️ Technology Stack
+
+### Frontend Architecture
+* **Core:** React.js (v18), built and bundled with Vite.
+* **Routing:** React Router DOM (v6).
+* **Styling:** Tailwind CSS.
+* **Animations:** Framer Motion.
+
+### Backend & Database (API)
+* **Runtime:** Node.js
+* **Framework:** Express.js (RESTful API architecture)
+* **Database:** MongoDB (NoSQL document storage for Products, Users, and Orders)
+* **Authentication:** JWT (JSON Web Tokens) & Nodemailer (for OTPs)
+
+<a name="design-system"></a>
+## 🎨 Design System & Typography
+
+Technologia relies on a dark-mode-first aesthetic (`#050b14`, `#0f172a`, `#1e293b`) to make premium product imagery pop, accented with Neon Blue (`#3b82f6`). 
+
+**Typography:**
+* **Global Default (`font-sans`):** Native sans-serif UI font (e.g., San Francisco, Segoe UI) for maximum readability and zero-latency loading.
+* **Monospace (`font-mono`):** Used strategically for raw data elements (Order IDs, User Emails) to provide a technical, "developer-focused" aesthetic.
+* **Font Weights:** Heavy reliance on `font-black` (Weight 900) for hero headings to establish a strong visual hierarchy.
+
+<a name="page-breakdown"></a>
+## 🗺️ Page & Component Breakdown
+
+1.  **Home Page (`/`)**: Features a video-background hero section and a mapped product grid with category filtering.
+2.  **Navigation & Cart (`Navbar.jsx`)**: Sticky header with search functionality and an animated off-canvas sidebar for cart management.
+3.  **Authentication Pages (`/login`, `/signup`, `/verify`)**: Centralized forms featuring a 6-digit OTP input mapped to a React `useRef` array for seamless auto-focusing.
+4.  **Checkout Modal (`CheckoutModal.jsx`)**: A multi-step modal featuring local address saving, dynamic payment option rendering, and environment-variable-protected UPI QR generation.
+5.  **Order Management (`/orders`)**: Displays past purchases with an `OrderTrackerModal` for an animated delivery timeline and order cancellation.
+6.  **Admin Inventory (`/add`)**: A protected route allowing authorized users to manage MongoDB product inventory directly from the frontend.
 
 ---
 
-## ⚙️ Installation & Setup
+<a name="setup"></a>
+## 💻 Local Setup & Comprehensive Installation
 
-Follow these steps to run the project locally.
+Follow these steps to run the Technologia platform on your local machine.
 
-### 1. Clone the Repository
-```bash
+<a name="prerequisites"></a>
+### 1. Prerequisites
+Ensure you have the following installed and set up:
+* **Node.js** (v16 or higher)
+* **Git**
+* A **MongoDB Atlas** account (or local MongoDB server)
+* A **Google/Gmail Account** (for sending OTP emails via Nodemailer)
+
+<a name="installation"></a>
+### 2. Installation
+Clone the repository and install dependencies for both the frontend and backend.
+
+
+# Clone the repo
 git clone [https://github.com/Ashu-Shukla-1309/Technologia.git](https://github.com/Ashu-Shukla-1309/Technologia.git)
 cd Technologia
-2. Backend Setup
-Bash
+
+# Install Backend Dependencies
 cd server
 npm install
-Create a .env file in the server folder:
 
-Code snippet
+# Install Frontend Dependencies
+cd ../client
+npm install
+
+
+<a name="backend-env"></a>
+
+### 3. Backend Configuration (`server/.env`)
+
+Create a `.env` file inside the **`server`** folder. You will need to configure your database and email transporter here.
+
+```env
+PORT=5000
 MONGO_URI=your_mongodb_connection_string
-JWT_SECRET=your_super_secret_key
+JWT_SECRET=your_super_secret_jwt_string
 EMAIL_USER=your_email@gmail.com
 EMAIL_PASS=your_google_app_password
 ADMIN_EMAIL=your_email@gmail.com
-Start the Server:
 
-Bash
-# Runs on localhost:5000
-npx nodemon index.js
-3. Frontend Setup
-Open a new terminal and navigate to the client folder:
+```
 
-Bash
+**How to get these values:**
+
+* **`MONGO_URI`**: Go to [MongoDB Atlas](https://www.mongodb.com/cloud/atlas), create a free cluster, click "Connect", choose "Connect your application", and copy the connection string. Replace `<password>` with your database user password.
+* **`JWT_SECRET`**: You can generate a random string or just type a secure passphrase (e.g., `TechnologiaSuperSecretKey2026!`).
+* **`EMAIL_USER`**: The Gmail address you want the platform to use to send OTPs.
+* **`EMAIL_PASS`**: **Do not use your normal Gmail password.** You must generate an "App Password".
+1. Go to your Google Account Management.
+2. Navigate to "Security" and ensure **2-Step Verification** is turned ON.
+3. Search for "App Passwords" in the security settings.
+4. Create a new App Password (name it "Technologia"), copy the generated 16-character code, and paste it here without spaces.
+
+
+* **`ADMIN_EMAIL`**: The email address that will automatically be granted Admin privileges (access to `/add` route) upon signup.
+
+<a name="frontend-env"></a>
+
+### 4. Frontend Configuration (`client/.env`)
+
+Create a `.env` file inside the **`client`** folder. Vite requires the `VITE_` prefix to expose these securely to the React app.
+
+```env
+VITE_ADMIN_UPI=your_actual_upi_id@bank
+VITE_ADMIN_NAME="Your Full Name"
+
+```
+
+**How to get these values:**
+
+* **`VITE_ADMIN_UPI`**: Enter your actual UPI ID (e.g., Google Pay, PhonePe, Paytm). The frontend uses this to dynamically generate a scannable QR code during checkout for simulated secure payments.
+* **`VITE_ADMIN_NAME`**: Your name, which will be displayed beneath the QR code to build trust with the user.
+
+<a name="running"></a>
+
+### 5. Running the Application
+
+You need to run both the Node.js server and the Vite React app simultaneously. Open two separate terminal windows/tabs.
+
+**Terminal 1 (Backend):**
+
+
+cd server
+npm start
+# or 'node index.js' / 'nodemon index.js'
+# You should see: "Server running on port 5000" and "MongoDB Connected"
+
+
+**Terminal 2 (Frontend):**
+
+
 cd client
-npm install
-Start the React App:
-
-Bash
-# Runs on localhost:5173
 npm run dev
-🔐 API Endpoints
-Method	Endpoint	Description
-GET	/api/products	Fetch all products
-POST	/api/products	Add new product (Admin only)
-DELETE	/api/products/:id	Remove product (Admin only)
-POST	/api/auth/register	Register new user
-POST	/api/auth/login	Login user
-POST	/api/orders	Submit order & send email
-📂 Folder Structure
-Technologia/
-├── client/             # React Frontend
-│   ├── src/
-│   │   ├── components/ # Reusable UI (Navbar, Modal)
-│   │   ├── pages/      # Full Pages (Home, Admin, Profile)
-│   │   └── App.jsx     # Main Router
-├── server/             # Node Backend
-│   ├── index.js        # Server Entry & API Routes
-│   └── .env            # Secrets (Ignored by Git)
-└── .gitignore          # Security rules
-🤝 Contributing
-Contributions are welcome!
+# You should see: "VITE ready... Local: http://localhost:5173/"
 
-Fork the project.
 
-Create your Feature Branch (git checkout -b feature/AmazingFeature).
 
-Commit your changes (git commit -m 'Add some AmazingFeature').
+Navigate to `http://localhost:5173/` in your browser to explore the platform!
 
-Push to the Branch (git push origin feature/AmazingFeature).
+---
 
-Open a Pull Request.
+<a name="author"></a>
 
-📝 License
-Distributed under the MIT License. See LICENSE for more information.
+### Author
 
-👨‍💻 Developed by Ashutosh Shukla
+**Ashutosh Shukla** BBDNIIT | Aspiring Software Engineer specializing in scalable Web Development, UI/UX, and AI integration.
+[LinkedIn Profile](https://www.linkedin.com/in/ashutoshshukla1309/) | [GitHub Profile](https://github.com/Ashu-Shukla-1309)
+
+```
