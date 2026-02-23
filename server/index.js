@@ -4,18 +4,16 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const nodemailer = require('nodemailer');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 
 const app = express();
 
-// 🚀 CRITICAL PROXY FIX: Must be before helmet and rate limiter
+// 🚀 CRITICAL PROXY FIX
 app.set('trust proxy', 1);
-
 app.use(helmet()); 
 
-// 🚀 DEPLOYMENT UPDATE: Dynamic CORS 
+// 🚀 DYNAMIC CORS
 const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
 app.use(cors({ origin: clientUrl, credentials: true })); 
 
@@ -64,7 +62,7 @@ const Order = mongoose.model('Order', new mongoose.Schema({
 const User = mongoose.model('User', new mongoose.Schema({
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
-  isVerified: { type: Boolean, default: false } // 👈 SECURITY LOCK
+  isVerified: { type: Boolean, default: false } // SECURITY LOCK
 }));
 
 const Otp = mongoose.model('Otp', new mongoose.Schema({
@@ -73,17 +71,11 @@ const Otp = mongoose.model('Otp', new mongoose.Schema({
   createdAt: { type: Date, expires: 300, default: Date.now } 
 }));
 
-const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 587, // 👈 Changed from 465 to 587
-  secure: false, // 👈 Must be false for 587 (it upgrades to secure via STARTTLS)
-  auth: { 
-    user: process.env.EMAIL_USER, 
-    pass: process.env.EMAIL_PASS 
-  }
-});
-
 app.use('/api/auth/', authLimiter);
+
+// ---------------------------------------------------------
+// 🚀 AUTHENTICATION ROUTES (MOCK EMAILS VIA CONSOLE.LOG)
+// ---------------------------------------------------------
 
 app.post('/api/auth/register', async (req, res) => {
   try {
@@ -91,6 +83,7 @@ app.post('/api/auth/register', async (req, res) => {
     if (password.length < 6) return res.status(400).json({ error: "Password too short" });
     
     let user = await User.findOne({ email });
+    
     if (user) {
       if (user.isVerified) return res.status(400).json({ error: "Email already registered" });
       const salt = await bcrypt.genSalt(10);
@@ -106,10 +99,11 @@ app.post('/api/auth/register', async (req, res) => {
     const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
     await Otp.findOneAndUpdate({ email }, { code: verificationCode }, { upsert: true, returnDocument: 'after' });
 
-    // 🚀 THE HACK: Print to Render logs instead of fighting the firewall
+    // 🚀 MOCK EMAIL: Prints to Render Logs instead of sending an actual email
     console.log(`\n=========================================`);
-    console.log(`📧 MOCK EMAIL SENT TO: ${email}`);
-    console.log(`🔐 OTP CODE IS: ${verificationCode}`);
+    console.log(`📧 NEW REGISTRATION OTP`);
+    console.log(`To: ${email}`);
+    console.log(`Code: ${verificationCode}`);
     console.log(`=========================================\n`);
 
     res.json({ message: "Verification code generated! Check Render Logs." });
@@ -129,17 +123,17 @@ app.post('/api/auth/forgot-password', async (req, res) => {
     const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
     await Otp.findOneAndUpdate({ email }, { code: resetCode }, { upsert: true, returnDocument: 'after' });
 
-    await transporter.sendMail({
-      from: process.env.EMAIL_USER,
-      to: email,
-      subject: "Password Reset Request",
-      html: `<h2>Password Reset</h2><p>Your password reset code is: <b style="font-size: 24px;">${resetCode}</b></p><p>This code expires in 5 minutes.</p>`
-    });
+    // 🚀 MOCK EMAIL
+    console.log(`\n=========================================`);
+    console.log(`📧 PASSWORD RESET OTP`);
+    console.log(`To: ${email}`);
+    console.log(`Code: ${resetCode}`);
+    console.log(`=========================================\n`);
 
-    res.json({ message: "Reset code sent successfully!" });
+    res.json({ message: "Reset code generated! Check Render Logs." });
   } catch (err) {
-    console.error("🚨 EMAIL/FORGOT-PW CRASH:", err);
-    res.status(500).json({ error: "Failed to send reset email" });
+    console.error("🚨 FORGOT-PW CRASH:", err);
+    res.status(500).json({ error: "Failed to process reset" });
   }
 });
 
@@ -150,7 +144,7 @@ app.post('/api/auth/verify-otp', async (req, res) => {
     const record = await Otp.findOne({ email, code: otp });
     if (!record) return res.status(400).json({ error: "Invalid or expired code" });
     
-    // 👈 UNLOCK ACCOUNT
+    // UNLOCK ACCOUNT
     await User.findOneAndUpdate({ email }, { isVerified: true });
     await Otp.deleteOne({ email }); 
     
@@ -189,7 +183,7 @@ app.post('/api/auth/login', async (req, res) => {
     
     const isAdmin = email === process.env.ADMIN_EMAIL;
 
-    // 👈 BLOCK UNVERIFIED USERS (Admin Bypass)
+    // BLOCK UNVERIFIED USERS (Admin Bypass)
     if (!user.isVerified && !isAdmin) {
       return res.status(403).json({ error: "Please verify your email with the OTP first!" });
     }
@@ -203,6 +197,10 @@ app.post('/api/auth/login', async (req, res) => {
     res.status(500).json({ error: "Login error" });
   }
 });
+
+// ---------------------------------------------------------
+// 🚀 PRODUCT & ORDER ROUTES
+// ---------------------------------------------------------
 
 app.get('/api/products', async (req, res) => {
   try {
@@ -235,20 +233,14 @@ app.post('/api/orders', async (req, res) => {
     await newOrder.save();
 
     const formattedTotal = total.toLocaleString('en-IN');
-    const mailOptions = {
-      from: process.env.EMAIL_USER,
-      to: process.env.ADMIN_EMAIL,
-      subject: `💰 NEW SALE: ₹${formattedTotal} from ${customerName}`,
-      html: `
-        <h2>New Order Received!</h2>
-        <p><b>Customer:</b> ${customerName} (${email})</p>
-        <p><b>Total:</b> ₹${formattedTotal}</p>
-        <p><b>Payment Method:</b> ${paymentMethod || 'N/A'}</p>
-        <p><b>Transaction ID:</b> ${transactionId || 'N/A'}</p>
-      `
-    };
+    
+    // 🚀 MOCK EMAIL: Admin Notification
+    console.log(`\n=========================================`);
+    console.log(`💰 NEW SALE: ₹${formattedTotal}`);
+    console.log(`Customer: ${customerName} (${email})`);
+    console.log(`Payment: ${paymentMethod} | TXN: ${transactionId || 'N/A'}`);
+    console.log(`=========================================\n`);
 
-    transporter.sendMail(mailOptions, (err) => { if (err) console.error("🚨 EMAIL/ORDER CRASH:", err); });
     res.json(newOrder);
   } catch (err) {
     res.status(500).json({ error: "Order failed" });
@@ -269,20 +261,13 @@ app.delete('/api/orders/:id', async (req, res) => {
         await Order.findByIdAndDelete(req.params.id);
 
         const formattedTotal = orderToCancel.total.toLocaleString('en-IN');
-        const mailOptions = {
-          from: process.env.EMAIL_USER,
-          to: process.env.ADMIN_EMAIL,
-          subject: `🚨 ORDER CANCELLED: ₹${formattedTotal} by ${orderToCancel.email}`,
-          html: `
-            <h2 style="color: red;">Order Cancellation Notice</h2>
-            <p><b>Customer Email:</b> ${orderToCancel.email}</p>
-            <p><b>Customer Name:</b> ${orderToCancel.customerName || 'N/A'}</p>
-            <p><b>Refund/Cancelled Amount:</b> ₹${formattedTotal}</p>
-            <p><b>Order ID:</b> ${orderToCancel._id}</p>
-          `
-        };
-
-        transporter.sendMail(mailOptions, (err) => { if (err) console.error("🚨 EMAIL/CANCEL CRASH:", err); });
+        
+        // 🚀 MOCK EMAIL: Admin Cancellation Alert
+        console.log(`\n=========================================`);
+        console.log(`🚨 ORDER CANCELLED: ₹${formattedTotal}`);
+        console.log(`Customer: ${orderToCancel.email}`);
+        console.log(`Order ID: ${orderToCancel._id}`);
+        console.log(`=========================================\n`);
 
         res.json({ message: "Order cancelled successfully" });
     } catch (err) {
