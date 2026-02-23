@@ -9,7 +9,7 @@ const Orders = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
-    axios.get('http://localhost:5000/api/orders')
+    axios.get('${import.meta.env.VITE_API_URL}/orders')
       .then(res => setOrders(res.data))
       .catch(err => console.error(err));
   }, []);
@@ -21,7 +21,7 @@ const Orders = () => {
 
   const handleCancelOrder = async (id) => {
     try {
-      await axios.delete(`http://localhost:5000/api/orders/${id}`);
+      await axios.delete(`${import.meta.env.VITE_API_URL}/orders/${id}`);
       setOrders(orders.filter(order => order._id !== id));
       // Return true to let the modal know the API call succeeded 
       // so it can show the CancelAnim before closing.

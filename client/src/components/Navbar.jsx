@@ -15,7 +15,7 @@ const Navbar = ({ cart, removeFromCart, updateQuantity, isOpen, setIsOpen, clear
 
   const handleCheckoutSubmit = async (orderData) => {
     try {
-      await axios.post('http://localhost:5000/api/orders', orderData);
+      await axios.post('${import.meta.env.VITE_API_URL}/orders', orderData);
       // Removed clearCart() and close functions here to allow CheckoutModal to show the success animation.
     } catch (err) { 
       alert("Failed to place order.");

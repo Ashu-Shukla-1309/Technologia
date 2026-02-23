@@ -11,7 +11,12 @@ const rateLimit = require('express-rate-limit');
 const app = express();
 
 app.use(helmet()); 
-app.use(cors({ origin: 'http://localhost:5173', credentials: true })); 
+
+// 🚀 DEPLOYMENT UPDATE 1: Dynamic CORS 
+// It will use your live Vercel URL if available, otherwise defaults to localhost for testing.
+const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+app.use(cors({ origin: clientUrl, credentials: true })); 
+
 app.use(express.json({ limit: '10kb' })); 
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 
@@ -49,7 +54,8 @@ const Product = mongoose.model('Product', new mongoose.Schema({
 
 const Order = mongoose.model('Order', new mongoose.Schema({
   email: String, customerName: String, phone: String, address: String,
-  items: Array, total: Number, date: { type: Date, default: Date.now }
+  items: Array, total: Number, date: { type: Date, default: Date.now },
+  paymentMethod: String, transactionId: String // Added these to match your new frontend!
 }));
 
 const User = mongoose.model('User', new mongoose.Schema({
@@ -108,7 +114,6 @@ app.post('/api/auth/forgot-password', async (req, res) => {
     if (!user) return res.status(404).json({ error: "User not found" });
 
     const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
-    // Fixed Mongoose deprecation warning here by using returnDocument: 'after'
     await Otp.findOneAndUpdate({ email }, { code: resetCode }, { upsert: true, returnDocument: 'after' });
 
     await transporter.sendMail({
@@ -125,7 +130,6 @@ app.post('/api/auth/forgot-password', async (req, res) => {
   }
 });
 
-// MISSING VERIFY ROUTE FOR SIGNUPS
 app.post('/api/auth/verify-otp', async (req, res) => {
   try {
     const { email, otp } = req.body;
@@ -140,7 +144,6 @@ app.post('/api/auth/verify-otp', async (req, res) => {
   }
 });
 
-// MISSING RESET ROUTE FOR FORGOT PASSWORD
 app.post('/api/auth/reset-password', async (req, res) => {
   try {
     const { email, otp, newPassword } = req.body;
@@ -203,8 +206,9 @@ app.delete('/api/products/:id', async (req, res) => {
 
 app.post('/api/orders', async (req, res) => {
   try {
-    const { email, customerName, phone, address, items, total } = req.body;
-    const newOrder = new Order({ email, customerName, phone, address, items, total });
+    // Also destructured the new payment fields you added to the frontend
+    const { email, customerName, phone, address, items, total, paymentMethod, transactionId } = req.body;
+    const newOrder = new Order({ email, customerName, phone, address, items, total, paymentMethod, transactionId });
     await newOrder.save();
 
     const formattedTotal = total.toLocaleString('en-IN');
@@ -216,6 +220,8 @@ app.post('/api/orders', async (req, res) => {
         <h2>New Order Received!</h2>
         <p><b>Customer:</b> ${customerName} (${email})</p>
         <p><b>Total:</b> ₹${formattedTotal}</p>
+        <p><b>Payment Method:</b> ${paymentMethod || 'N/A'}</p>
+        <p><b>Transaction ID:</b> ${transactionId || 'N/A'}</p>
       `
     };
 
@@ -262,4 +268,7 @@ app.delete('/api/orders/:id', async (req, res) => {
     }
 });
 
-app.listen(5000, () => console.log("🚀 Fortress Server active on 5000"));
+// 🚀 DEPLOYMENT UPDATE 2: Dynamic Port
+// Render will supply process.env.PORT, otherwise it defaults to 5000 locally
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => console.log(`🚀 Fortress Server active on port ${PORT}`));

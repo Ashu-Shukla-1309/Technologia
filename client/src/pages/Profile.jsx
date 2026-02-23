@@ -6,7 +6,7 @@ const Profile = ({ logout }) => {
   const email = localStorage.getItem('userEmail');
 
   useEffect(() => {
-    axios.get(`http://localhost:5000/api/orders?email=${email}`)
+    axios.get(`${import.meta.env.VITE_API_URL}/orders?email=${email}`)
       .then(res => setOrders(res.data));
   }, [email]);
 

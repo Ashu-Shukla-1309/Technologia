@@ -12,7 +12,7 @@ const AddProduct = ({ fetchProducts }) => {
 
   const refreshInventory = async () => {
     try {
-      const res = await axios.get('http://localhost:5000/api/products');
+      const res = await axios.get('${import.meta.env.VITE_API_URL}/products');
       setProducts(res.data);
     } catch (err) { console.error("Failed to load inventory"); }
   };
@@ -22,7 +22,7 @@ const AddProduct = ({ fetchProducts }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await axios.post('http://localhost:5000/api/products', formData);
+      await axios.post('${import.meta.env.VITE_API_URL}/products', formData);
       alert('Product Added Successfully!');
       setFormData({ name: '', price: '', category: 'Electronics', image: '' }); 
       fetchProducts();
@@ -33,7 +33,7 @@ const AddProduct = ({ fetchProducts }) => {
   const handleDelete = async (id) => {
     if (window.confirm("Are you sure you want to delete this product?")) {
       try {
-        await axios.delete(`http://localhost:5000/api/products/${id}`);
+        await axios.delete(`${import.meta.env.VITE_API_URL}/products/${id}`);
         refreshInventory(); 
         fetchProducts();
       } catch (err) { alert("Failed to delete product"); }
