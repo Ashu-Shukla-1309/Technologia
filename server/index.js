@@ -56,12 +56,13 @@ const Product = mongoose.model('Product', new mongoose.Schema({
 const Order = mongoose.model('Order', new mongoose.Schema({
   email: String, customerName: String, phone: String, address: String,
   items: Array, total: Number, date: { type: Date, default: Date.now },
-  paymentMethod: String, transactionId: String // Added these to match your new frontend!
+  paymentMethod: String, transactionId: String
 }));
 
 const User = mongoose.model('User', new mongoose.Schema({
   email: { type: String, required: true, unique: true },
-  password: { type: String, required: true }
+  password: { type: String, required: true },
+  isVerified: { type: Boolean, default: false } // 👈 SECURITY LOCK
 }));
 
 const Otp = mongoose.model('Otp', new mongoose.Schema({
@@ -102,7 +103,7 @@ app.post('/api/auth/register', async (req, res) => {
 
     res.json({ message: "User registered successfully & code sent!" });
   } catch (err) {
-    console.error(err);
+    console.error("🚨 EMAIL/REGISTER CRASH:", err); // 👈 CRASH LOGGING
     res.status(500).json({ error: "Registration failed" });
   }
 });
@@ -126,7 +127,7 @@ app.post('/api/auth/forgot-password', async (req, res) => {
 
     res.json({ message: "Reset code sent successfully!" });
   } catch (err) {
-    console.error(err);
+    console.error("🚨 EMAIL/FORGOT-PW CRASH:", err);
     res.status(500).json({ error: "Failed to send reset email" });
   }
 });
@@ -138,7 +139,10 @@ app.post('/api/auth/verify-otp', async (req, res) => {
     const record = await Otp.findOne({ email, code: otp });
     if (!record) return res.status(400).json({ error: "Invalid or expired code" });
     
+    // 👈 UNLOCK ACCOUNT
+    await User.findOneAndUpdate({ email }, { isVerified: true });
     await Otp.deleteOne({ email }); 
+    
     res.json({ message: "Account verified successfully!" });
   } catch (err) {
     res.status(500).json({ error: "Verification failed" });
@@ -171,8 +175,13 @@ app.post('/api/auth/login', async (req, res) => {
   try {
     const user = await User.findOne({ email });
     if (!user) return res.status(400).json({ error: "User not found" });
+    
+    // 👈 BLOCK UNVERIFIED USERS
+    if (!user.isVerified) return res.status(403).json({ error: "Please verify your email with the OTP first!" });
+
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(400).json({ error: "Wrong password" });
+    
     const isAdmin = email === process.env.ADMIN_EMAIL;
     const token = jwt.sign({ id: user._id, isAdmin }, process.env.JWT_SECRET, { expiresIn: '2h' });
     res.json({ token, email: user.email, isAdmin });
@@ -207,7 +216,6 @@ app.delete('/api/products/:id', async (req, res) => {
 
 app.post('/api/orders', async (req, res) => {
   try {
-    // Also destructured the new payment fields you added to the frontend
     const { email, customerName, phone, address, items, total, paymentMethod, transactionId } = req.body;
     const newOrder = new Order({ email, customerName, phone, address, items, total, paymentMethod, transactionId });
     await newOrder.save();
@@ -226,7 +234,7 @@ app.post('/api/orders', async (req, res) => {
       `
     };
 
-    transporter.sendMail(mailOptions, (err) => { if (err) console.log("Email Error:", err); });
+    transporter.sendMail(mailOptions, (err) => { if (err) console.log("🚨 EMAIL/ORDER CRASH:", err); });
     res.json(newOrder);
   } catch (err) {
     res.status(500).json({ error: "Order failed" });
@@ -260,7 +268,7 @@ app.delete('/api/orders/:id', async (req, res) => {
           `
         };
 
-        transporter.sendMail(mailOptions, (err) => { if (err) console.log("Email Error:", err); });
+        transporter.sendMail(mailOptions, (err) => { if (err) console.log("🚨 EMAIL/CANCEL CRASH:", err); });
 
         res.json({ message: "Order cancelled successfully" });
     } catch (err) {
@@ -269,7 +277,5 @@ app.delete('/api/orders/:id', async (req, res) => {
     }
 });
 
-// 🚀 DEPLOYMENT UPDATE 2: Dynamic Port
-// Render will supply process.env.PORT, otherwise it defaults to 5000 locally
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`🚀 Fortress Server active on port ${PORT}`));
