@@ -7,6 +7,7 @@ Technologia is a full-stack, Single Page Application (SPA) designed to deliver a
 
 ## 📑 Table of Contents
 - [Key Features](#key-features)
+- [Security Implementations](#security)
 - [Technology Stack](#tech-stack)
 - [Design System & Typography](#design-system)
 - [Page & Component Breakdown](#page-breakdown)
@@ -16,6 +17,7 @@ Technologia is a full-stack, Single Page Application (SPA) designed to deliver a
   - [3. Backend Configuration (.env)](#backend-env)
   - [4. Frontend Configuration (.env)](#frontend-env)
   - [5. Running the Application](#running)
+- [Deployment Architecture](#deployment)
 - [Author](#author)
 
 ---
@@ -29,6 +31,16 @@ Technologia is a full-stack, Single Page Application (SPA) designed to deliver a
 * **Visual Order Tracking:** A dynamic, step-by-step timeline tracking the shipment status of user orders.
 * **Integrated Payment UI:** Simulated secure checkout with options for Card, Cash on Delivery, and dynamic UPI QR code generation linked via environment variables.
 * **Admin Dashboard:** Full CRUD operations for managing the product inventory directly from the frontend (Protected Route).
+
+<a name="security"></a>
+## 🛡️ Security Implementations
+
+Designed with production-grade security standards in mind:
+* **Rate Limiting:** Protects authentication routes from brute-force attacks (`express-rate-limit`).
+* **HTTP Headers:** Secures Express apps by setting various HTTP headers (`helmet`).
+* **NoSQL Injection Prevention:** Custom recursive sanitization middleware cleanses `req.body`, `req.query`, and `req.params` of dangerous `$` or `.` MongoDB operators.
+* **Password Hashing:** Uses `bcryptjs` with a salt round of 10 for secure credential storage.
+* **Environment Protection:** API URLs, JWT Secrets, Database URIs, and Admin UPI details are strictly hidden behind `.env` configurations.
 
 <a name="tech-stack"></a>
 ## 🛠️ Technology Stack
@@ -84,7 +96,6 @@ Ensure you have the following installed and set up:
 ### 2. Installation
 Clone the repository and install dependencies for both the frontend and backend.
 
-
 # Clone the repo
 git clone [https://github.com/Ashu-Shukla-1309/Technologia.git](https://github.com/Ashu-Shukla-1309/Technologia.git)
 cd Technologia
@@ -96,7 +107,6 @@ npm install
 # Install Frontend Dependencies
 cd ../client
 npm install
-
 
 <a name="backend-env"></a>
 
@@ -111,6 +121,7 @@ JWT_SECRET=your_super_secret_jwt_string
 EMAIL_USER=your_email@gmail.com
 EMAIL_PASS=your_google_app_password
 ADMIN_EMAIL=your_email@gmail.com
+CLIENT_URL=http://localhost:5173
 
 ```
 
@@ -137,6 +148,7 @@ Create a `.env` file inside the **`client`** folder. Vite requires the `VITE_` p
 ```env
 VITE_ADMIN_UPI=your_actual_upi_id@bank
 VITE_ADMIN_NAME="Your Full Name"
+VITE_API_URL=http://localhost:5000
 
 ```
 
@@ -155,21 +167,31 @@ You need to run both the Node.js server and the Vite React app simultaneously. O
 
 
 cd server
-npm start
-# or 'node index.js' / 'nodemon index.js'
+npx node index.js or npx nodemon index.js
 # You should see: "Server running on port 5000" and "MongoDB Connected"
 
 
-**Terminal 2 (Frontend):**
 
+**Terminal 2 (Frontend):**
 
 cd client
 npm run dev
 # You should see: "VITE ready... Local: http://localhost:5173/"
 
 
-
 Navigate to `http://localhost:5173/` in your browser to explore the platform!
+
+---
+
+<a name="deployment"></a>
+
+## ☁️ Deployment Architecture
+
+The application is fully configured for cloud deployment:
+
+* **Frontend (Vercel):** The React/Vite client is optimized for Vercel. Ensure `VITE_API_URL` is updated to point to the live backend URL in Vercel's Environment Variables settings.
+* **Backend (Render):** The Node/Express API is hosted as a Web Service on Render. The `CLIENT_URL` environment variable must be set to the live Vercel domain to configure CORS securely.
+* **Database (MongoDB Atlas):** Network access configured to allow `0.0.0.0/0` for dynamic cloud IP routing.
 
 ---
 
@@ -180,4 +202,3 @@ Navigate to `http://localhost:5173/` in your browser to explore the platform!
 **Ashutosh Shukla** BBDNIIT | Aspiring Software Engineer specializing in scalable Web Development, UI/UX, and AI integration.
 [LinkedIn Profile](https://www.linkedin.com/in/ashutoshshukla1309/) | [GitHub Profile](https://github.com/Ashu-Shukla-1309)
 
-```
