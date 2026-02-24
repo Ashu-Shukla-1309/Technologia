@@ -9,16 +9,18 @@ We built this using the **MERN Stack** (MongoDB, Express, React, Node.js) and ma
 
 ## 📑 Table of Contents
 
-1. [What Can It Do? (Key Features)](https://www.google.com/search?q=%23key-features)
-2. [How Is It Kept Safe? (Security)](https://www.google.com/search?q=%23security)
-3. [What is it Built With? (Tech Stack)](https://www.google.com/search?q=%23tech-stack)
-4. [How Does it Look? (Design)](https://www.google.com/search?q=%23design-system)
-5. [Step-by-Step Setup Guide (For Beginners!)](https://www.google.com/search?q=%23setup)
-* [Step 1: Things You Need First](https://www.google.com/search?q=%23prerequisites)
-* [Step 2: Downloading the Code](https://www.google.com/search?q=%23installation)
-* [Step 3: Setting Up the "Brain" (Backend/Server)](https://www.google.com/search?q=%23backend-env)
-* [Step 4: Setting Up the "Face" (Frontend/Website)](https://www.google.com/search?q=%23frontend-env)
-* [Step 5: Turning It On!](https://www.google.com/search?q=%23running)
+1. [What Can It Do? (Key Features)](#what-can-it-do-key-features)
+2. [How Is It Kept Safe? (Security)](#how-is-it-kept-safe-security)
+3. [What is it Built With? (Tech Stack)](#what-is-it-built-with-tech-stack)
+4. [How Does it Look? (Design)](#how-does-it-look-design)
+5. [Step-by-Step Setup Guide (For Beginners!)](#step-by-step-setup-guide-for-beginners)
+   * [Step 1: Things You Need First (Prerequisites)](#step-1-things-you-need-first-prerequisites)
+   * [Step 2: Downloading the Code](#step-2-downloading-the-code)
+   * [Step 3: Setting Up the "Brain" (Backend)](#step-3-setting-up-the-brain-backend)
+   * [Step 4: Setting Up the "Face" (Frontend)](#step-4-setting-up-the-face-frontend)
+   * [Step 5: Turning It On!](#step-5-turning-it-on)
+6. [Putting It on the Internet (Deployment)](#putting-it-on-the-internet-deployment)
+7. [Meet the Creator](#meet-the-creator)
 
 
 6. [Putting It on the Internet (Deployment)](https://www.google.com/search?q=%23deployment)
