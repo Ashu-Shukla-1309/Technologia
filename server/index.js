@@ -13,7 +13,6 @@ const app = express();
 app.set('trust proxy', 1);
 app.use(helmet()); 
 
-
 app.use(cors({ 
   origin: [
     'http://localhost:5173', 
@@ -128,7 +127,9 @@ app.post('/api/auth/register', async (req, res) => {
       subject: "Technologia: Your Verification Code",
       html: `<h2>Welcome to Technologia!</h2><p>Your verification code is: <b style="font-size: 24px;">${verificationCode}</b></p>`
     };
-    await sendEmail(mailOptions, "USER REGISTRATION OTP");
+    
+    // 🚀 FIX: Removed 'await' so it doesn't freeze the frontend
+    sendEmail(mailOptions, "USER REGISTRATION OTP");
 
     res.json({ message: "Verification code sent!" });
   } catch (err) {
@@ -153,7 +154,9 @@ app.post('/api/auth/forgot-password', async (req, res) => {
       subject: "Technologia: Password Reset Request",
       html: `<h2>Password Reset</h2><p>Your password reset code is: <b style="font-size: 24px;">${resetCode}</b></p><p>This code expires in 5 minutes.</p>`
     };
-    await sendEmail(mailOptions, "PASSWORD RESET OTP");
+    
+    // 🚀 FIX: Removed 'await'
+    sendEmail(mailOptions, "PASSWORD RESET OTP");
 
     res.json({ message: "Reset code generated!" });
   } catch (err) {
@@ -259,7 +262,9 @@ app.post('/api/orders', async (req, res) => {
       subject: `💰 NEW SALE: ₹${formattedTotal} from ${customerName}`,
       html: `<h2>New Order Received!</h2><p><b>Customer:</b> ${customerName} (${email})</p><p><b>Total:</b> ₹${formattedTotal}</p><p><b>Method:</b> ${paymentMethod || 'N/A'}</p><p><b>Transaction ID:</b> ${transactionId || 'N/A'}</p>`
     };
-    await sendEmail(mailOptions, "NEW ORDER ALERT");
+    
+    // 🚀 FIX: Removed 'await'. Now it replies to React instantly!
+    sendEmail(mailOptions, "NEW ORDER ALERT");
 
     console.log(`\n💰 =========================================`);
     console.log(`NEW SALE DETECTED`);
@@ -300,7 +305,9 @@ app.delete('/api/orders/:id', async (req, res) => {
           subject: `🚨 ORDER CANCELLED: ₹${formattedTotal} by ${orderToCancel.email}`,
           html: `<h2 style="color: red;">Order Cancellation Notice</h2><p><b>Customer Email:</b> ${orderToCancel.email}</p><p><b>Refund Amount:</b> ₹${formattedTotal}</p><p><b>Order ID:</b> ${orderToCancel._id}</p>`
         };
-        await sendEmail(mailOptions, "ORDER CANCELLATION ALERT");
+        
+        // 🚀 FIX: Removed 'await'
+        sendEmail(mailOptions, "ORDER CANCELLATION ALERT");
 
         console.log(`\n🚨 =========================================`);
         console.log(`ORDER CANCELLED BY USER`);
