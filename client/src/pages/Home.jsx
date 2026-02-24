@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const Home = ({ products, addToCart, searchTerm }) => {
+const Home = ({ products = [], addToCart, searchTerm }) => {
   const [index, setIndex] = useState(0);
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [unitCounts, setUnitCounts] = useState({});
@@ -21,12 +21,12 @@ const Home = ({ products, addToCart, searchTerm }) => {
     }
   };
 
-  // Extract unique categories
-  const categories = ["All", ...new Set(products.map(p => p.category))];
+  const safeProducts = Array.isArray(products) ? products : [];
 
-  // Filter products by search term and category
-  const filteredProducts = products.filter(p => {
-    const matchesSearch = p.name.toLowerCase().includes((searchTerm || "").toLowerCase());
+  const categories = ["All", ...new Set(safeProducts.map(p => p.category))];
+
+  const filteredProducts = safeProducts.filter(p => {
+    const matchesSearch = p.name?.toLowerCase().includes((searchTerm || "").toLowerCase());
     const matchesCategory = selectedCategory === "All" || p.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
@@ -41,11 +41,7 @@ const Home = ({ products, addToCart, searchTerm }) => {
 
   return (
     <div className="bg-[#050b14] min-h-screen text-white font-sans overflow-x-hidden">
-      
-      {/* --- HERO SECTION --- */}
       <section className="relative h-screen flex items-center justify-center overflow-hidden">
-        
-        {/* Background Video Layer */}
         <div className="absolute inset-0 z-0">
           <div className="absolute inset-0 bg-[#050b14]/70 z-10" /> 
           <video 
@@ -57,8 +53,6 @@ const Home = ({ products, addToCart, searchTerm }) => {
         </div>
 
         <div className="container mx-auto px-6 z-20 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center h-full">
-          
-          {/* Left Content */}
           <div className="text-left pt-10">
             <motion.div 
               initial={{ opacity: 0, x: -50 }} 
@@ -104,13 +98,9 @@ const Home = ({ products, addToCart, searchTerm }) => {
             </motion.div>
           </div>
 
-          {/* Right Content: 3D Image + VORTEX GLOW */}
           <div className="hidden lg:flex justify-center items-center relative h-[600px] w-full">
-            
-            {/* 1. STRONG CENTRAL GLOW (The Core) */}
             <div className="absolute w-[400px] h-[400px] bg-blue-600 rounded-full blur-[100px] opacity-60 animate-pulse mix-blend-screen" />
 
-            {/* 2. SPINNING VORTEX RINGS */}
             <motion.div 
               className="absolute w-[550px] h-[550px] rounded-full border-[4px] border-t-blue-400 border-r-transparent border-b-blue-600 border-l-transparent"
               animate={{ rotate: 360 }}
@@ -123,7 +113,6 @@ const Home = ({ products, addToCart, searchTerm }) => {
               transition={{ duration: 12, repeat: Infinity, ease: "linear" }}
             />
 
-            {/* 3. The Product Image */}
             <motion.img 
                src="https://file.aiquickdraw.com/imgcompressed/img/compressed_a7034e1056dd5c8b6968d755161bac3a.webp" 
               alt="Future Tech"
@@ -135,7 +124,6 @@ const Home = ({ products, addToCart, searchTerm }) => {
         </div>
       </section>
 
-      {/* --- EXPLORE ITEMS SECTION --- */}
       <div id="shop-section" className="relative z-30 bg-[#050b14] py-24 border-t border-white/10">
         <div className="container mx-auto px-6">
           
@@ -146,7 +134,6 @@ const Home = ({ products, addToCart, searchTerm }) => {
             </div>
           </div>
 
-          {/* Category Filter */}
           <div className="flex flex-wrap gap-4 mb-12">
             {categories.map(cat => (
               <button 
@@ -163,7 +150,6 @@ const Home = ({ products, addToCart, searchTerm }) => {
             ))}
           </div>
 
-          {/* Product Grid */}
           {filteredProducts.length === 0 ? (
              <div className="text-center py-20 opacity-50">
                <h3 className="text-2xl font-bold">No products found.</h3>
@@ -181,7 +167,6 @@ const Home = ({ products, addToCart, searchTerm }) => {
                   key={product._id}
                   className="bg-[#111827] border border-gray-800 p-4 rounded-3xl group hover:border-blue-500 hover:shadow-[0_0_30px_rgba(59,130,246,0.2)] transition-all duration-300 flex flex-col"
                 >
-                  {/* Product Image Area */}
                   <div className="h-64 flex items-center justify-center mb-6 bg-[#050b14] rounded-2xl p-4 overflow-hidden">
                     <motion.img 
                       whileHover={{ scale: 1.15 }} transition={{ duration: 0.3 }}
@@ -189,7 +174,6 @@ const Home = ({ products, addToCart, searchTerm }) => {
                     />
                   </div>
                   
-                  {/* Product Info */}
                   <div className="px-2 pb-2 flex-1 flex flex-col">
                     <p className="text-xs text-blue-400 font-bold uppercase tracking-wider mb-2">{product.category}</p>
                     <h3 className="font-bold text-xl text-white mb-4 line-clamp-2">{product.name}</h3>
@@ -198,7 +182,6 @@ const Home = ({ products, addToCart, searchTerm }) => {
                       <span className="text-2xl font-black text-white block mb-4">₹{product.price}</span>
                       
                       <div className="flex justify-between items-center gap-2">
-                        {/* Unit Selector */}
                         <div className="flex items-center bg-[#1e293b] rounded-full p-1 border border-gray-700">
                           <button onClick={() => handleUnitChange(product._id, -1)} className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:bg-gray-700 hover:text-white transition">-</button>
                           <span className="w-8 text-center font-bold text-sm">{units}</span>

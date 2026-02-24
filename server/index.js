@@ -13,8 +13,15 @@ const app = express();
 app.set('trust proxy', 1);
 app.use(helmet()); 
 
-const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
-app.use(cors({ origin: clientUrl, credentials: true })); 
+
+app.use(cors({ 
+  origin: [
+    'http://localhost:5173', 
+    'https://technologia-ibm.vercel.app',
+    process.env.CLIENT_URL
+  ].filter(Boolean), 
+  credentials: true 
+}));
 
 app.use(express.json({ limit: '10kb' })); 
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));

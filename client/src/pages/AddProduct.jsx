@@ -13,8 +13,16 @@ const AddProduct = ({ fetchProducts }) => {
   const refreshInventory = async () => {
     try {
       const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/products`);
-      setProducts(res.data);
-    } catch (err) { console.error("Failed to load inventory"); }
+      if (Array.isArray(res.data)) {
+        setProducts(res.data);
+      } else {
+        setProducts([]);
+        console.error("API did not return an array", res.data);
+      }
+    } catch (err) { 
+      console.error("Failed to load inventory", err); 
+      setProducts([]);
+    }
   };
 
   const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -39,6 +47,8 @@ const AddProduct = ({ fetchProducts }) => {
       } catch (err) { alert("Failed to delete product"); }
     }
   };
+
+  const safeProducts = Array.isArray(products) ? products : [];
 
   return (
     <div className="min-h-screen bg-[#050b14] text-white p-6 md:p-12 font-sans">
@@ -71,10 +81,10 @@ const AddProduct = ({ fetchProducts }) => {
         </motion.div>
 
         <motion.div initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }}>
-           <h2 className="text-3xl font-black mb-6 text-white uppercase tracking-tighter">Current Stock ({products.length})</h2>
+           <h2 className="text-3xl font-black mb-6 text-white uppercase tracking-tighter">Current Stock ({safeProducts.length})</h2>
            <div className="space-y-4 max-h-[80vh] overflow-y-auto pr-2 custom-scrollbar">
              <AnimatePresence>
-               {products.map(product => (
+               {safeProducts.map(product => (
                  <motion.div key={product._id} layout initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} className="bg-[#1e293b]/50 border border-gray-700 p-4 rounded-2xl flex items-center gap-4 group hover:bg-[#1e293b] transition-colors">
                    <div className="w-16 h-16 bg-white/5 rounded-xl flex items-center justify-center p-2">
                      <img src={product.image} alt={product.name} className="w-full h-full object-contain" />
