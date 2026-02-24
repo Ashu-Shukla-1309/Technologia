@@ -9,10 +9,7 @@ const Orders = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
-    // 1. Grab the currently logged-in user's email from local storage
     const userEmail = localStorage.getItem('userEmail');
-    
-    // 2. Attach it to the URL as a query parameter (?email=...)
     axios.get(`${import.meta.env.VITE_API_URL}/api/orders?email=${userEmail}`)
       .then(res => setOrders(res.data))
       .catch(err => console.error(err));
@@ -26,9 +23,6 @@ const Orders = () => {
   const handleCancelOrder = async (id) => {
     try {
       await axios.delete(`${import.meta.env.VITE_API_URL}/api/orders/${id}`);
-      setOrders(orders.filter(order => order._id !== id));
-      // Return true to let the modal know the API call succeeded 
-      // so it can show the CancelAnim before closing.
       return true; 
     } catch (err) {
       alert("Failed to cancel.");
@@ -101,7 +95,13 @@ const Orders = () => {
 
       <OrderTrackerModal 
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={() => {
+          setIsModalOpen(false);
+          const userEmail = localStorage.getItem('userEmail');
+          axios.get(`${import.meta.env.VITE_API_URL}/api/orders?email=${userEmail}`)
+            .then(res => setOrders(res.data))
+            .catch(err => console.error(err));
+        }}
         order={selectedOrder}
         onCancelOrder={handleCancelOrder}
       />

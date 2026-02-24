@@ -7,7 +7,6 @@ const Navbar = ({ cart, removeFromCart, updateQuantity, isOpen, setIsOpen, clear
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
   
-  // Calculate total factoring in quantity
   const total = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
   
@@ -16,10 +15,9 @@ const Navbar = ({ cart, removeFromCart, updateQuantity, isOpen, setIsOpen, clear
   const handleCheckoutSubmit = async (orderData) => {
     try {
       await axios.post(`${import.meta.env.VITE_API_URL}/api/orders`, orderData);
-      // Removed clearCart() and close functions here to allow CheckoutModal to show the success animation.
     } catch (err) { 
       alert("Failed to place order.");
-      throw err; // Re-throw to prevent animation if failed
+      throw err; 
     }
   };
 
@@ -27,6 +25,11 @@ const Navbar = ({ cart, removeFromCart, updateQuantity, isOpen, setIsOpen, clear
     clearCart();
     setIsOpen(false);
     setIsCheckoutOpen(false);
+  };
+
+  const initiateCheckout = () => {
+    setIsOpen(false); 
+    setIsCheckoutOpen(true);
   };
 
   return (
@@ -128,9 +131,9 @@ const Navbar = ({ cart, removeFromCart, updateQuantity, isOpen, setIsOpen, clear
         {cart.length > 0 && (
           <div className="p-6 border-t border-gray-700 bg-[#1e293b] space-y-4">
              <div className="flex justify-between text-xl font-black">
-                <span>Subtotal</span><span>₹{total.toFixed(2)}</span>
+               <span>Subtotal</span><span>₹{total.toFixed(2)}</span>
              </div>
-             <button onClick={() => setIsCheckoutOpen(true)} className="w-full bg-green-500 py-4 rounded-xl font-bold text-black hover:bg-green-400">Checkout</button>
+             <button onClick={initiateCheckout} className="w-full bg-green-500 py-4 rounded-xl font-bold text-black hover:bg-green-400">Checkout</button>
           </div>
         )}
       </div>
