@@ -43,7 +43,7 @@ const LoginTemp = ({ setToken, setIsAdmin }) => {
               onChange={e => setPassword(e.target.value)} required 
             />
             <div className="text-right mt-2">
-              <Link to="/forgot-password" class="text-sm text-blue-500 font-bold hover:underline">Forgot Password?</Link>
+              <Link to="/forgot-password" className="text-sm text-blue-500 font-bold hover:underline">Forgot Password?</Link>
             </div>
           </div>
           <button className="w-full bg-blue-600 text-white py-4 rounded-2xl font-black text-lg hover:bg-blue-700 transition">
