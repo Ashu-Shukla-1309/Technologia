@@ -9,7 +9,7 @@ We built this using the **MERN Stack** (MongoDB, Express, React, Node.js) and ma
 
 ## 📑 Table of Contents
 
-1. [What Can It Do? (Key Features)](#what-can-it-do-key-features)
+1. [What Can It Do? (Key Features)]([#what-can-it-do-key-features](https://github.com/Ashu-Shukla-1309/Technologia/blob/main/README.md#-what-can-it-do-key-features))
 2. [How Is It Kept Safe? (Security)](#how-is-it-kept-safe-security)
 3. [What is it Built With? (Tech Stack)](#what-is-it-built-with-tech-stack)
 4. [How Does it Look? (Design)](#how-does-it-look-design)
