@@ -22,7 +22,6 @@ function App() {
   const [isAdmin, setIsAdmin] = useState(localStorage.getItem('isAdmin') === 'true');
 
   const fetchProducts = () => {
-    
     axios.get(`${import.meta.env.VITE_API_URL}/api/products`)
       .then(res => setProducts(res.data))
       .catch(err => console.error("Fetch Error:", err));
@@ -32,7 +31,6 @@ function App() {
     fetchProducts();
   }, []);
 
-  // Updated to handle quantity
   const addToCart = (product, quantity = 1) => {
     setCart((prevCart) => {
       const existingItem = prevCart.find(item => item._id === product._id);
@@ -46,7 +44,6 @@ function App() {
     setIsCartOpen(true);
   };
 
-  // Function to update quantity from inside the cart
   const updateQuantity = (id, delta) => {
     setCart((prevCart) => prevCart.map(item => {
       if (item._id === id) {
@@ -62,7 +59,6 @@ function App() {
   };
 
   const logout = () => {
-    // Only remove the auth keys, leave savedAddresses alone!
     localStorage.removeItem('token');
     localStorage.removeItem('userEmail');
     localStorage.removeItem('isAdmin');
@@ -74,7 +70,8 @@ function App() {
 
   return (
     <BrowserRouter>
-      <div className="min-h-screen bg-[#050b14] flex flex-col font-sans">
+      {/* 🚀 Updated wrapper background to gray-50 */}
+      <div className="min-h-screen bg-gray-50 flex flex-col font-sans">
         <Navbar 
           cart={cart} 
           removeFromCart={removeFromCart}

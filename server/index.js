@@ -78,7 +78,8 @@ const Order = mongoose.model('Order', new mongoose.Schema({
   total: Number, 
   date: { type: Date, default: Date.now },
   paymentMethod: String, 
-  transactionId: String
+  transactionId: String,
+  status: { type: String, default: 'Processing' } 
 }));
 
 const User = mongoose.model('User', new mongoose.Schema({
@@ -94,7 +95,6 @@ const Otp = mongoose.model('Otp', new mongoose.Schema({
 }));
 
 // Primary function to send emails using Brevo REST API
-// Bypasses the SMTP port blocks found on cloud providers like Render
 const sendEmail = async (mailOptions, logTitle) => {
   try {
     const senderEmail = process.env.EMAIL_USER;
@@ -115,7 +115,6 @@ const sendEmail = async (mailOptions, logTitle) => {
     });
     console.log(`Success: API Email Sent for ${logTitle}`);
   } catch (err) {
-    // Fallback log for local terminal debugging if the API call fails
     console.error(`Brevo API Error [${logTitle}]:`, err.response?.data || err.message);
     console.log(`\nEmail Log Fallback: ${logTitle}`);
     console.log(`Recipient: ${mailOptions.to}\nSubject: ${mailOptions.subject}\n---`);
@@ -155,7 +154,6 @@ app.post('/api/auth/register', async (req, res) => {
       html: `<h2>Welcome to Technologia!</h2><p>Your verification code is: <b style="font-size: 24px;">${verificationCode}</b></p>`
     };
     
-    // Non-blocking promise to ensure the frontend responds immediately
     sendEmail(mailOptions, "USER REGISTRATION OTP");
 
     res.json({ message: "Verification code sent to your email" });
@@ -342,7 +340,6 @@ app.post('/api/orders', async (req, res) => {
     
     sendEmail(mailOptions, "NEW ORDER NOTIFICATION");
 
-    // Internal console log for live monitoring on Render terminal
     console.log(`\nNew Transaction Logged`);
     console.log(`-------------------------`);
     console.log(`Customer: ${customerName}`);
@@ -362,6 +359,26 @@ app.get('/api/orders', async (req, res) => {
   const { email } = req.query;
   const filter = email ? { email: email.toLowerCase() } : {};
   res.json(await Order.find(filter).sort({ date: -1 }));
+});
+
+// 🚀 NEW: Admin route to update order status
+app.put('/api/orders/:id/status', async (req, res) => {
+  try {
+    const { status, adminEmail } = req.body;
+    
+    if (adminEmail !== process.env.ADMIN_EMAIL) {
+      return res.status(403).json({ error: "Unauthorized. Admin access required." });
+    }
+
+    const updatedOrder = await Order.findByIdAndUpdate(
+      req.params.id, 
+      { status }, 
+      { new: true }
+    );
+    res.json(updatedOrder);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to update status" });
+  }
 });
 
 // Handle order cancellations and notify the admin with refund details
