@@ -22,7 +22,6 @@ const Footer = () => {
           <div>
             <h3 className="text-gray-900 font-black mb-6 uppercase tracking-wider">Company</h3>
             <ul className="space-y-3 text-sm">
-              {/* 🚀 Internal routing for professional project navigation */}
               <li><Link to="/" className="hover:text-blue-600 transition">About Technologia</Link></li>
               <li><Link to="/profile" className="hover:text-blue-600 transition">Careers</Link></li>
               <li className="hover:text-blue-600 cursor-pointer transition">Sustainability</li>
@@ -34,7 +33,6 @@ const Footer = () => {
           <div>
             <h3 className="text-gray-900 font-black mb-6 uppercase tracking-wider">Support</h3>
             <ul className="space-y-3 text-sm">
-              {/* 🚀 Direct access to tracking and account support */}
               <li><Link to="/orders" className="hover:text-blue-600 transition">Track Order</Link></li>
               <li className="hover:text-blue-600 cursor-pointer transition">Warranty Claim</li>
               <li className="hover:text-blue-600 cursor-pointer transition">Return Center</li>
@@ -46,7 +44,6 @@ const Footer = () => {
           <div>
             <h3 className="text-gray-900 font-black mb-6 uppercase tracking-wider">Social</h3>
             <div className="flex gap-4">
-              [cite_start]{/* 🚀 Verified External Links [cite: 22] */}
               <a 
                 href="https://www.linkedin.com/in/ashutoshshukla1309/" 
                 target="_blank" 
