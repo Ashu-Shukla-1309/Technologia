@@ -87,10 +87,12 @@ const Otp = mongoose.model('Otp', new mongoose.Schema({
 // API-based email sender using Brevo to bypass Render's SMTP blocks
 const sendEmail = async (mailOptions, logTitle) => {
   try {
+    // 🚀 THE FINAL FIX: Using your verified Gmail address as the sender
     await axios.post('https://api.brevo.com/v3/smtp/email', {
-      // Using a pre-verified Brevo sender for maximum deliverability
-      sender: { name: "Technologia Support", email: "onboarding@brevo.com" },
-      replyTo: { email: "irumaashutosh@gmail.com" },
+      sender: { 
+        name: "Technologia Support", 
+        email: "irumaashutosh@gmail.com" // Must match your verified Brevo sender
+      },
       to: [{ email: mailOptions.to }],
       subject: mailOptions.subject,
       htmlContent: mailOptions.html
@@ -100,14 +102,16 @@ const sendEmail = async (mailOptions, logTitle) => {
         'Content-Type': 'application/json'
       }
     });
-    console.log(`Success: API Email Sent for ${logTitle}`);
+    console.log(`✅ Success: API Email Sent for ${logTitle}`);
   } catch (err) {
-    // Terminal fallback: ensures OTPs are still visible in Render logs for testing
-    console.log(`\nEmail Log Fallback: ${logTitle}`);
-    console.log(`Recipient: ${mailOptions.to}\nSubject: ${mailOptions.subject}\n---`);
-    console.log(mailOptions.html.replace(/<[^>]*>?/gm, '')); 
+    // Detailed error logging to help debug if it fails again
+    console.error(`❌ Brevo API Error [${logTitle}]:`, err.response?.data || err.message);
+    
+    // BACKUP: Log the OTP to the terminal so your demo never fails
+    console.log(`\n📧 [BACKUP LOG] ${logTitle}`);
+    console.log(`To: ${mailOptions.to}\nSubject: ${mailOptions.subject}\n---`);
+    console.log(mailOptions.html.replace(/<[^>]*>?/gm, ''));
     console.log(`-----------------------------------------\n`);
-    console.error("Brevo API Error:", err.response?.data?.message || err.message);
   }
 };
 
