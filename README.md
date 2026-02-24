@@ -33,7 +33,7 @@ We built this using the **MERN Stack** (MongoDB, Express, React, Node.js) and ma
 * **Smooth Animations:** The website feels alive! Buttons react when you hover over them, pages slide in smoothly, and pop-up messages appear beautifully, all thanks to a tool called **Framer Motion**.
 * **Track Your Order:** Once you buy something, you get a visual timeline showing exactly where your package is (like "Processing," "Shipped," "Delivered").
 * **Easy Checkout:** When you're ready to pay, a slick window pops up. You can choose to pay by Card, Cash on Delivery, or even scan a real, generated UPI QR Code with your phone!
-* **Secret Admin Area:** If you are the owner (Admin), you get a special hidden dashboard where you can add new gadgets, change prices, or delete items right from the website.
+* **Secret Admin Area:** If you are the owner (Admin), you get a special hidden dashboard where you can add new gadgets, change prices, or delete items right from the website and also you will get all the updates Orders recieved/ Cancelled with all the info of the customer like Name, Contact details and address and you can update Order status of customer's order in the database (Mongodb Atlas).
 
 <a name="security"></a>
 
@@ -68,7 +68,7 @@ We built this to be as secure as a real, professional store:
 
 Technologia is designed to look like a high-end tech brand.
 
-* **Colors:** We use a sleek **Dark Mode** (deep blues and blacks) so the colorful pictures of the gadgets really stand out. We use a bright **Neon Blue** to highlight important buttons.
+* **Colors:** We use a sleek **Light Mode** so the colorful pictures of the gadgets really stand out.
 * **Fonts:** We use clean, easy-to-read fonts for normal text, and special "computer code" style fonts for things like Order Numbers to give it a cool, techy feel.
 
 ---
@@ -140,6 +140,7 @@ BREVO_API_KEY=your_brevo_api_key
 EMAIL_USER=your_email@gmail.com
 ADMIN_EMAIL=your_email@gmail.com
 CLIENT_URL=http://localhost:5173
+EMAIL_PASS=your_app_password
 
 ```
 
@@ -163,6 +164,19 @@ CLIENT_URL=http://localhost:5173
 
 
 * **`EMAIL_USER` & `ADMIN_EMAIL**`: Put your real email address here.
+* **`EMAIL_PASS`**: 
+1. Enable Two-Factor Authentication (2FA)
+Before creating an app password, you must enable 2-Step Verification on your Google Account.  Go to your Google Account settings, navigate to Security, and under "How you sign in to Google," select 2-Step Verification.  Follow the prompts to set up a method like SMS, authenticator app, or security key. 
+
+2. Access the App Passwords Page
+After enabling 2FA, go to the App Passwords page at https://myaccount.google.com/apppasswords.  You may be prompted to sign in again for security verification. 
+
+3.Generate a New App Password
+
+Click Select app and choose Other (since the app may not be listed). 
+Enter a name for the app (e.g., "Outlook," "Mail Client," or "SharedInbox") in the App name field. 
+Click Generate.
+A 16-character app password will appear.  Copy it immediately—you won’t be able to view it again and put it as EMAIL_PASS= that password
 
 <a name="frontend-env"></a>
 
@@ -211,7 +225,7 @@ You are almost there! You need to start both the "Brain" and the "Face" at the s
 1. Make sure you are inside the `server` folder.
 2. Type:
 ```bash
-node index.js
+npx node index.js
 
 ```
 
