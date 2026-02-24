@@ -1,6 +1,3 @@
-This README is designed to be comprehensive, professional, and incredibly easy to follow. It breaks down complex steps into simple actions so anyone can get Technologia running locally, reflecting the full stack and your latest integrations.
-
----
 
 # 🛍️ Technologia | Premium Tech Gadgets E-Commerce
 
@@ -19,11 +16,11 @@ We built this using the **MERN Stack** (MongoDB, Express, React, Node.js) and ma
 5. [Step-by-Step Setup Guide (For Beginners!)](#-step-by-step-setup-guide-for-beginners)
    * [Step 1: Things You Need First (Prerequisites)](#step-1-things-you-need-first-prerequisites)
    * [Step 2: Downloading the Code](#step-2-downloading-the-code)
-   * [Step 3: Setting Up the "Brain" (Backend)](#-step-3-setting-up-the-brain-backend)
-   * [Step 4: Setting Up the "Face" (Frontend)](#-step-4-setting-up-the-face-frontend)
-   * [Step 5: Turning It On!](#-step-5-turning-it-on)
+   * [Step 3: Setting Up the "Brain" (Backend)](#step-3-setting-up-the-brain-backend)
+   * [Step 4: Setting Up the "Face" (Frontend)](step-4-setting-up-the-face-frontend)
+   * [Step 5: Turning It On!](#step-5-turning-it-on)
 6. [Putting It on the Internet (Deployment)](#️-putting-it-on-the-internet-deployment)
-7. [Meet the Creator](#-meet-the-creator)
+7. [Meet the Creator](#meet-the-creator)
 
 ---
 
