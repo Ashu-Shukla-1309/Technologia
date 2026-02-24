@@ -4,11 +4,12 @@ import CancelAnim from './CancelAnim';
 
 const OrderTrackerModal = ({ isOpen, onClose, order, onCancelOrder }) => {
   const [view, setView] = useState('tracking');
+  const [isLoading, setIsLoading] = useState(false); // 🚀 NEW: Loading state
   
-  // 🚀 CRITICAL FIX: Reset the tracker screen every time it opens
   useEffect(() => {
     if (isOpen) {
       setView('tracking');
+      setIsLoading(false);
     }
   }, [isOpen]);
 
@@ -23,11 +24,13 @@ const OrderTrackerModal = ({ isOpen, onClose, order, onCancelOrder }) => {
   ];
 
   const executeCancellation = async (e) => {
-    e.preventDefault(); // 🚀 CRITICAL FIX
+    e.preventDefault(); 
+    setIsLoading(true); // 🚀 Start loading spinner
     const success = await onCancelOrder(order._id);
     if (success) {
       setView('cancelled'); 
     }
+    setIsLoading(false); // 🚀 Stop loading spinner
   };
 
   return (
@@ -50,7 +53,7 @@ const OrderTrackerModal = ({ isOpen, onClose, order, onCancelOrder }) => {
                  </h2>
                  <p className="text-xs text-blue-400 font-mono">ID: {order._id}</p>
                </div>
-               <button type="button" onClick={onClose} className="text-gray-400 hover:text-white text-xl">✕</button>
+               <button type="button" disabled={isLoading} onClick={onClose} className="text-gray-400 hover:text-white text-xl disabled:opacity-50">✕</button>
             </div>
           )}
 
@@ -101,7 +104,7 @@ const OrderTrackerModal = ({ isOpen, onClose, order, onCancelOrder }) => {
 
                   <div className="pt-4 border-t border-gray-800">
                     <button 
-                      type="button" // 🚀 CRITICAL FIX
+                      type="button" 
                       onClick={() => setView('confirm')}
                       className="w-full py-4 rounded-xl border border-red-500/30 text-red-500 font-bold hover:bg-red-500 hover:text-white transition-all"
                     >
@@ -121,8 +124,12 @@ const OrderTrackerModal = ({ isOpen, onClose, order, onCancelOrder }) => {
                   <h3 className="text-2xl font-black text-white mb-2">Are you sure?</h3>
                   <p className="text-gray-400 mb-8 max-w-xs mx-auto">This action cannot be undone. You will be refunded to your original payment method.</p>
                   <div className="flex gap-4">
-                    <button type="button" onClick={() => setView('tracking')} className="flex-1 py-3 rounded-xl bg-gray-800 text-white font-bold hover:bg-gray-700 transition">No, Keep Order</button>
-                    <button type="button" onClick={executeCancellation} className="flex-1 py-3 rounded-xl bg-red-600 text-white font-bold hover:bg-red-500 shadow-lg shadow-red-500/20 transition">Yes, Cancel</button>
+                    <button type="button" disabled={isLoading} onClick={() => setView('tracking')} className="flex-1 py-3 rounded-xl bg-gray-800 text-white font-bold hover:bg-gray-700 transition disabled:opacity-50">No, Keep Order</button>
+                    <button type="button" disabled={isLoading} onClick={executeCancellation} className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-red-600 text-white font-bold hover:bg-red-500 shadow-lg shadow-red-500/20 transition disabled:opacity-50">
+                      {isLoading ? (
+                         <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                      ) : 'Yes, Cancel'}
+                    </button>
                   </div>
                 </motion.div>
               )}

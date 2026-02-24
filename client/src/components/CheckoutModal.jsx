@@ -4,6 +4,7 @@ import SuccessAnim from './SuccessAnim';
 
 const CheckoutModal = ({ isOpen, onClose, onFinalSuccess, onSubmit, cart, total }) => {
   const [isSuccess, setIsSuccess] = useState(false);
+  const [isLoading, setIsLoading] = useState(false); // 🚀 NEW: Loading State
   const [addresses, setAddresses] = useState([]);
   const [selectedAddressId, setSelectedAddressId] = useState(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -20,10 +21,10 @@ const CheckoutModal = ({ isOpen, onClose, onFinalSuccess, onSubmit, cart, total 
   const adminUPI = import.meta.env.VITE_ADMIN_UPI || "admin@upi";
   const adminName = import.meta.env.VITE_ADMIN_NAME || "Store Admin";
 
-  // 🚀 CRITICAL FIX: Reset the success screen every time the modal opens
   useEffect(() => {
     if (isOpen) {
       setIsSuccess(false);
+      setIsLoading(false);
     }
   }, [isOpen]);
 
@@ -76,9 +77,11 @@ const CheckoutModal = ({ isOpen, onClose, onFinalSuccess, onSubmit, cart, total 
   };
 
   const handleLocalSubmit = async (e) => {
-    e.preventDefault(); // 🚀 CRITICAL FIX: Stops phantom reloads
+    e.preventDefault(); 
     if (!selectedAddressId) return alert("Please select or add a delivery address.");
     
+    setIsLoading(true); // 🚀 Start loading animation
+
     const addr = addresses.find(a => a.id === selectedAddressId);
     const fullAddress = `${addr.address}, ${addr.city}, ${addr.zip}`;
     const userEmail = localStorage.getItem('userEmail') || "Guest";
@@ -96,9 +99,11 @@ const CheckoutModal = ({ isOpen, onClose, onFinalSuccess, onSubmit, cart, total 
 
     try {
       await onSubmit(orderData); 
-      setIsSuccess(true); // Triggers the animation!
+      setIsSuccess(true); 
     } catch (error) {
       console.error("Submission error:", error);
+    } finally {
+      setIsLoading(false); // 🚀 Stop loading animation
     }
   };
 
@@ -120,7 +125,7 @@ const CheckoutModal = ({ isOpen, onClose, onFinalSuccess, onSubmit, cart, total 
             <div className="flex flex-col h-full overflow-hidden min-h-0">
                <div className="p-6 border-b border-gray-800 flex justify-between items-center bg-[#1e293b] shrink-0">
                  <h2 className="text-2xl font-black text-white uppercase">Secure Checkout</h2>
-                 <button onClick={onClose} type="button" className="text-gray-400 hover:text-white text-xl">✕</button>
+                 <button onClick={onClose} type="button" disabled={isLoading} className="text-gray-400 hover:text-white text-xl disabled:opacity-50">✕</button>
                </div>
                
                <div className="p-6 overflow-y-auto flex-1 custom-scrollbar space-y-8 min-h-0">
@@ -249,12 +254,19 @@ const CheckoutModal = ({ isOpen, onClose, onFinalSuccess, onSubmit, cart, total 
                
                <div className="p-6 border-t border-gray-800 bg-[#1e293b] shrink-0">
                  <button 
-                   type="button" // 🚀 CRITICAL FIX
+                   type="button" 
                    onClick={handleLocalSubmit} 
-                   disabled={!selectedAddressId || isFormOpen || !isPaymentValid()}
-                   className="w-full bg-gradient-to-r from-blue-600 to-purple-600 py-4 rounded-xl font-black text-lg text-white hover:scale-[1.02] transition-transform shadow-lg shadow-blue-500/25 disabled:opacity-50 disabled:hover:scale-100 disabled:cursor-not-allowed"
+                   disabled={!selectedAddressId || isFormOpen || !isPaymentValid() || isLoading}
+                   className="w-full flex items-center justify-center gap-3 bg-gradient-to-r from-blue-600 to-purple-600 py-4 rounded-xl font-black text-lg text-white hover:scale-[1.02] transition-transform shadow-lg shadow-blue-500/25 disabled:opacity-50 disabled:hover:scale-100 disabled:cursor-not-allowed"
                  >
-                   {paymentMethod === 'Cash on Delivery' ? `Place Order • ₹${grandTotal.toFixed(2)}` : `Pay ₹${grandTotal.toFixed(2)} Securely`}
+                   {isLoading ? (
+                     <>
+                       <div className="w-6 h-6 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
+                       Processing...
+                     </>
+                   ) : (
+                     paymentMethod === 'Cash on Delivery' ? `Place Order • ₹${grandTotal.toFixed(2)}` : `Pay ₹${grandTotal.toFixed(2)} Securely`
+                   )}
                  </button>
                </div>
             </div>
