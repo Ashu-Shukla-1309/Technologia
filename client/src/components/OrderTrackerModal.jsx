@@ -1,12 +1,15 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import CancelAnim from './CancelAnim'; // Import the new animation
+import CancelAnim from './CancelAnim';
 
 const OrderTrackerModal = ({ isOpen, onClose, order, onCancelOrder }) => {
-  const [view, setView] = useState('tracking'); // 'tracking', 'confirm', or 'cancelled'
+  const [view, setView] = useState('tracking');
   
+  // 🚀 CRITICAL FIX: Reset the tracker screen every time it opens
   useEffect(() => {
-    if (isOpen) setView('tracking');
+    if (isOpen) {
+      setView('tracking');
+    }
   }, [isOpen]);
 
   if (!isOpen || !order) return null;
@@ -19,11 +22,11 @@ const OrderTrackerModal = ({ isOpen, onClose, order, onCancelOrder }) => {
     { title: "Delivered", date: "Pending", completed: false },
   ];
 
-  const executeCancellation = async () => {
-    // Call API from parent, wait for success boolean
+  const executeCancellation = async (e) => {
+    e.preventDefault(); // 🚀 CRITICAL FIX
     const success = await onCancelOrder(order._id);
     if (success) {
-      setView('cancelled'); // Switch to animation view
+      setView('cancelled'); 
     }
   };
 
@@ -32,7 +35,6 @@ const OrderTrackerModal = ({ isOpen, onClose, order, onCancelOrder }) => {
       <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
         <motion.div 
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-          onClick={view !== 'cancelled' ? onClose : undefined} // Prevent closing by clicking outside during animation
           className="absolute inset-0 bg-black/80 backdrop-blur-md"
         />
 
@@ -40,7 +42,6 @@ const OrderTrackerModal = ({ isOpen, onClose, order, onCancelOrder }) => {
           className="relative bg-[#0f172a] w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden border border-white/10 flex flex-col max-h-[90vh]"
           initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} layout
         >
-          {/* Header - Hidden if showing Cancel Animation */}
           {view !== 'cancelled' && (
             <div className="p-6 border-b border-gray-800 flex justify-between items-center bg-[#1e293b]">
                <div>
@@ -49,7 +50,7 @@ const OrderTrackerModal = ({ isOpen, onClose, order, onCancelOrder }) => {
                  </h2>
                  <p className="text-xs text-blue-400 font-mono">ID: {order._id}</p>
                </div>
-               <button onClick={onClose} className="text-gray-400 hover:text-white text-xl">✕</button>
+               <button type="button" onClick={onClose} className="text-gray-400 hover:text-white text-xl">✕</button>
             </div>
           )}
 
@@ -100,6 +101,7 @@ const OrderTrackerModal = ({ isOpen, onClose, order, onCancelOrder }) => {
 
                   <div className="pt-4 border-t border-gray-800">
                     <button 
+                      type="button" // 🚀 CRITICAL FIX
                       onClick={() => setView('confirm')}
                       className="w-full py-4 rounded-xl border border-red-500/30 text-red-500 font-bold hover:bg-red-500 hover:text-white transition-all"
                     >
@@ -119,14 +121,14 @@ const OrderTrackerModal = ({ isOpen, onClose, order, onCancelOrder }) => {
                   <h3 className="text-2xl font-black text-white mb-2">Are you sure?</h3>
                   <p className="text-gray-400 mb-8 max-w-xs mx-auto">This action cannot be undone. You will be refunded to your original payment method.</p>
                   <div className="flex gap-4">
-                    <button onClick={() => setView('tracking')} className="flex-1 py-3 rounded-xl bg-gray-800 text-white font-bold hover:bg-gray-700 transition">No, Keep Order</button>
-                    <button onClick={executeCancellation} className="flex-1 py-3 rounded-xl bg-red-600 text-white font-bold hover:bg-red-500 shadow-lg shadow-red-500/20 transition">Yes, Cancel</button>
+                    <button type="button" onClick={() => setView('tracking')} className="flex-1 py-3 rounded-xl bg-gray-800 text-white font-bold hover:bg-gray-700 transition">No, Keep Order</button>
+                    <button type="button" onClick={executeCancellation} className="flex-1 py-3 rounded-xl bg-red-600 text-white font-bold hover:bg-red-500 shadow-lg shadow-red-500/20 transition">Yes, Cancel</button>
                   </div>
                 </motion.div>
               )}
 
               {view === 'cancelled' && (
-                <motion.div key="cancelled">
+                <motion.div key="cancelled" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
                   <CancelAnim onClose={onClose} />
                 </motion.div>
               )}
