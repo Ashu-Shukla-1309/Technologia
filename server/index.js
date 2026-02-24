@@ -6,17 +6,17 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
-const axios = require('axios'); // Added for API-based email delivery
+const axios = require('axios');
 
 const app = express();
 
-// Trust the first proxy to handle rate limiting correctly on Render
+// Trusting the proxy is necessary for rate limiting to work on Render's infrastructure
 app.set('trust proxy', 1);
 
-// Standard security headers to prevent common web vulnerabilities
+// Standard security middleware to protect the app from common web attacks
 app.use(helmet()); 
 
-// Dynamic CORS configuration to allow local testing and the live Vercel frontend
+// Configure CORS to allow our local development environment and our live Vercel frontend
 app.use(cors({ 
   origin: [
     'http://localhost:5173', 
@@ -26,11 +26,11 @@ app.use(cors({
   credentials: true 
 }));
 
-// Limit body size to prevent large payload attacks
+// Limit the size of incoming JSON to prevent memory exhaustion attacks
 app.use(express.json({ limit: '10kb' })); 
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 
-// Custom middleware to sanitize incoming data and prevent NoSQL injection attacks
+// Sanitize inputs to remove any keys starting with '$' or containing '.' to prevent NoSQL injection
 app.use((req, res, next) => {
   const sanitize = (obj) => {
     if (obj instanceof Object) {
@@ -49,36 +49,27 @@ app.use((req, res, next) => {
   next();
 });
 
-// Protect authentication routes from brute force attacks
+// Protect auth routes from brute force; 20 requests per 15 minutes per IP
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, 
   max: 20,
   message: { error: "Security alert: Too many attempts. Please try again later." }
 });
 
-// Connect to MongoDB Atlas using the connection string in environment variables
+// Connect to MongoDB Atlas
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log("Shielded DB Connected Successfully"))
   .catch(err => console.error("Database Connection Error:", err));
 
-// Schema definitions for products, orders, users, and OTP codes
+// Database Schemas
 const Product = mongoose.model('Product', new mongoose.Schema({
-  name: String, 
-  price: Number, 
-  image: String, 
-  category: String
+  name: String, price: Number, image: String, category: String
 }));
 
 const Order = mongoose.model('Order', new mongoose.Schema({
-  email: String, 
-  customerName: String, 
-  phone: String, 
-  address: String,
-  items: Array, 
-  total: Number, 
-  date: { type: Date, default: Date.now },
-  paymentMethod: String, 
-  transactionId: String
+  email: String, customerName: String, phone: String, address: String,
+  items: Array, total: Number, date: { type: Date, default: Date.now },
+  paymentMethod: String, transactionId: String
 }));
 
 const User = mongoose.model('User', new mongoose.Schema({
@@ -90,15 +81,16 @@ const User = mongoose.model('User', new mongoose.Schema({
 const Otp = mongoose.model('Otp', new mongoose.Schema({
   email: String,
   code: String,
-  createdAt: { type: Date, expires: 300, default: Date.now } // Codes expire after 5 minutes
+  createdAt: { type: Date, expires: 300, default: Date.now } 
 }));
 
-// Primary function to send emails using Brevo's REST API
-// This bypasses the SMTP port blocks found on cloud providers like Render
+// API-based email sender using Brevo to bypass Render's SMTP blocks
 const sendEmail = async (mailOptions, logTitle) => {
   try {
     await axios.post('https://api.brevo.com/v3/smtp/email', {
+      // Using a pre-verified Brevo sender for maximum deliverability
       sender: { name: "Technologia Support", email: "onboarding@brevo.com" },
+      replyTo: { email: "irumaashutosh@gmail.com" },
       to: [{ email: mailOptions.to }],
       subject: mailOptions.subject,
       htmlContent: mailOptions.html
@@ -110,27 +102,27 @@ const sendEmail = async (mailOptions, logTitle) => {
     });
     console.log(`Success: API Email Sent for ${logTitle}`);
   } catch (err) {
-    // Fallback log for local terminal debugging if the API call fails
+    // Terminal fallback: ensures OTPs are still visible in Render logs for testing
     console.log(`\nEmail Log Fallback: ${logTitle}`);
     console.log(`Recipient: ${mailOptions.to}\nSubject: ${mailOptions.subject}\n---`);
-    console.log(mailOptions.html.replace(/<[^>]*>?/gm, '')); // Strip HTML for console readability
+    console.log(mailOptions.html.replace(/<[^>]*>?/gm, '')); 
     console.log(`-----------------------------------------\n`);
-    console.error("API Error details:", err.response?.data?.message || err.message);
+    console.error("Brevo API Error:", err.response?.data?.message || err.message);
   }
 };
 
 app.use('/api/auth/', authLimiter);
 
-// Handle new user registration and generate verification code
+// Auth: Register new account
 app.post('/api/auth/register', async (req, res) => {
   try {
     const { email, password } = req.body;
-    if (password.length < 6) return res.status(400).json({ error: "Password must be at least 6 characters" });
+    if (password.length < 6) return res.status(400).json({ error: "Password must be 6+ chars" });
     
     let user = await User.findOne({ email });
     
     if (user) {
-      if (user.isVerified) return res.status(400).json({ error: "This email is already registered" });
+      if (user.isVerified) return res.status(400).json({ error: "Email already exists" });
       const salt = await bcrypt.genSalt(10);
       user.password = await bcrypt.hash(password, salt);
       await user.save();
@@ -142,7 +134,7 @@ app.post('/api/auth/register', async (req, res) => {
     }
 
     const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
-    await Otp.findOneAndUpdate({ email }, { code: verificationCode }, { upsert: true, returnDocument: 'after' });
+    await Otp.findOneAndUpdate({ email }, { code: verificationCode }, { upsert: true });
 
     const mailOptions = {
       to: email,
@@ -150,82 +142,72 @@ app.post('/api/auth/register', async (req, res) => {
       html: `<h2>Welcome to Technologia!</h2><p>Your verification code is: <b style="font-size: 24px;">${verificationCode}</b></p>`
     };
     
-    // We do not 'await' this so the frontend response remains fast
+    // Floating promise: send email in background for faster UX
     sendEmail(mailOptions, "USER REGISTRATION OTP");
 
-    res.json({ message: "Verification code sent to your email" });
+    res.json({ message: "Verification code sent" });
   } catch (err) {
-    console.error("Registration Error:", err);
-    res.status(500).json({ error: "Internal registration failure" });
+    res.status(500).json({ error: "Registration process failed" });
   }
 });
 
-// Trigger password reset workflow
+// Auth: Request password reset
 app.post('/api/auth/forgot-password', async (req, res) => {
   try {
     const { email } = req.body;
-    
     const user = await User.findOne({ email });
     if (!user) return res.status(404).json({ error: "User not found" });
 
     const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
-    await Otp.findOneAndUpdate({ email }, { code: resetCode }, { upsert: true, returnDocument: 'after' });
+    await Otp.findOneAndUpdate({ email }, { code: resetCode }, { upsert: true });
 
     const mailOptions = {
       to: email,
       subject: "Technologia: Password Reset Request",
-      html: `<h2>Password Reset</h2><p>Your password reset code is: <b style="font-size: 24px;">${resetCode}</b></p><p>This code expires in 5 minutes.</p>`
+      html: `<h2>Password Reset</h2><p>Your reset code is: <b style="font-size: 24px;">${resetCode}</b></p>`
     };
     
     sendEmail(mailOptions, "PASSWORD RESET OTP");
-
     res.json({ message: "Reset code generated" });
   } catch (err) {
-    console.error("Forgot Password Error:", err);
-    res.status(500).json({ error: "Failed to process password reset" });
+    res.status(500).json({ error: "Failed to process request" });
   }
 });
 
-// Validate the OTP provided by the user
+// Auth: Verify OTP code
 app.post('/api/auth/verify-otp', async (req, res) => {
   try {
     const { email, otp } = req.body;
-    
     const record = await Otp.findOne({ email, code: otp });
-    if (!record) return res.status(400).json({ error: "Invalid or expired verification code" });
+    if (!record) return res.status(400).json({ error: "Invalid or expired code" });
     
     await User.findOneAndUpdate({ email }, { isVerified: true });
     await Otp.deleteOne({ email }); 
-    
-    res.json({ message: "Account successfully verified" });
+    res.json({ message: "Account verified" });
   } catch (err) {
-    res.status(500).json({ error: "Verification process failed" });
+    res.status(500).json({ error: "Verification failed" });
   }
 });
 
-// Update password after OTP is successfully verified
+// Auth: Set new password
 app.post('/api/auth/reset-password', async (req, res) => {
   try {
     const { email, otp, newPassword } = req.body;
-    
     const record = await Otp.findOne({ email, code: otp });
-    if (!record) return res.status(400).json({ error: "Invalid or expired code" });
+    if (!record) return res.status(400).json({ error: "Invalid code" });
 
-    if (newPassword.length < 6) return res.status(400).json({ error: "Password must be at least 6 characters" });
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(newPassword, salt);
 
     await User.findOneAndUpdate({ email }, { password: hashedPassword });
     await Otp.deleteOne({ email });
-
-    res.json({ message: "Password updated successfully" });
+    res.json({ message: "Password updated" });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Failed to reset password" });
+    res.status(500).json({ error: "Update failed" });
   }
 });
 
-// Standard login with JWT token generation
+// Auth: Login
 app.post('/api/auth/login', async (req, res) => {
   const { email, password } = req.body;
   try {
@@ -233,9 +215,8 @@ app.post('/api/auth/login', async (req, res) => {
     if (!user) return res.status(400).json({ error: "User not found" });
     
     const isAdmin = email === process.env.ADMIN_EMAIL;
-
     if (!user.isVerified && !isAdmin) {
-      return res.status(403).json({ error: "Please verify your email with the OTP first" });
+      return res.status(403).json({ error: "Email verification required" });
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
@@ -248,99 +229,71 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-// Inventory management routes
+// Products: Get all
 app.get('/api/products', async (req, res) => {
-  try {
-    const products = await Product.find();
-    res.json(products);
-  } catch (err) {
-    res.status(500).json({ error: "Failed to fetch products" });
-  }
+  res.json(await Product.find());
 });
 
+// Products: Add new
 app.post('/api/products', async (req, res) => {
-    const newProduct = new Product(req.body);
-    await newProduct.save();
-    res.json(newProduct);
+  const newProduct = new Product(req.body);
+  await newProduct.save();
+  res.json(newProduct);
 });
 
+// Products: Delete
 app.delete('/api/products/:id', async (req, res) => {
-    try {
-        await Product.findByIdAndDelete(req.params.id);
-        res.json({ message: "Product successfully removed" });
-    } catch (err) {
-        res.status(500).json({ error: "Removal failed" });
-    }
+  await Product.findByIdAndDelete(req.params.id);
+  res.json({ message: "Item removed" });
 });
 
-// Process new orders and send admin notifications
+// Orders: Place new order
 app.post('/api/orders', async (req, res) => {
   try {
-    const { email, customerName, phone, address, items, total, paymentMethod, transactionId } = req.body;
-    const newOrder = new Order({ email, customerName, phone, address, items, total, paymentMethod, transactionId });
+    const newOrder = new Order(req.body);
     await newOrder.save();
 
-    const formattedTotal = total.toLocaleString('en-IN');
-    
+    const formattedTotal = req.body.total.toLocaleString('en-IN');
     const mailOptions = {
       to: process.env.ADMIN_EMAIL,
-      subject: `New Sale Alert: ₹${formattedTotal} from ${customerName}`,
-      html: `<h2>New Order Details</h2><p><b>Customer:</b> ${customerName} (${email})</p><p><b>Total:</b> ₹${formattedTotal}</p><p><b>Method:</b> ${paymentMethod || 'N/A'}</p><p><b>Transaction ID:</b> ${transactionId || 'N/A'}</p>`
+      subject: `New Sale: ₹${formattedTotal} from ${req.body.customerName}`,
+      html: `<h2>Order Notification</h2><p><b>Customer:</b> ${req.body.customerName}</p><p><b>Total:</b> ₹${formattedTotal}</p>`
     };
     
     sendEmail(mailOptions, "NEW ORDER NOTIFICATION");
-
-    // Internal console log for live monitoring on Render terminal
-    console.log(`\nNew Transaction Logged`);
-    console.log(`-------------------------`);
-    console.log(`Customer: ${customerName}`);
-    console.log(`Total:    ₹${formattedTotal}`);
-    console.log(`Items:    ${items.length} units`);
-    console.log(`-------------------------\n`);
-
     res.json(newOrder);
   } catch (err) {
-    console.error("Order Creation Error:", err);
-    res.status(500).json({ error: "Failed to process order" });
+    res.status(500).json({ error: "Order processing failed" });
   }
 });
 
-// Retrieve order history for a specific user
+// Orders: Get history
 app.get('/api/orders', async (req, res) => {
   const { email } = req.query;
   const filter = email ? { email: email.toLowerCase() } : {};
   res.json(await Order.find(filter).sort({ date: -1 }));
 });
 
-// Handle order cancellations and notify the admin for refunds
+// Orders: Cancel
 app.delete('/api/orders/:id', async (req, res) => {
-    try {
-        const orderToCancel = await Order.findById(req.params.id);
-        if (!orderToCancel) return res.status(404).json({ error: "Order record not found" });
+  try {
+    const orderToCancel = await Order.findById(req.params.id);
+    if (!orderToCancel) return res.status(404).json({ error: "Order not found" });
 
-        await Order.findByIdAndDelete(req.params.id);
-
-        const formattedTotal = orderToCancel.total.toLocaleString('en-IN');
-        
-        const mailOptions = {
-          to: process.env.ADMIN_EMAIL,
-          subject: `Order Cancellation: ₹${formattedTotal} by ${orderToCancel.email}`,
-          html: `<h2>Cancellation Notice</h2><p><b>Customer Email:</b> ${orderToCancel.email}</p><p><b>Refund Due:</b> ₹${formattedTotal}</p><p><b>Order ID:</b> ${orderToCancel._id}</p>`
-        };
-        
-        sendEmail(mailOptions, "CANCELLATION ALERT");
-
-        console.log(`\nOrder Cancelled`);
-        console.log(`-------------------------`);
-        console.log(`Customer: ${orderToCancel.customerName || 'N/A'}`);
-        console.log(`Refund:   ₹${formattedTotal}`);
-        console.log(`-------------------------\n`);
-
-        res.json({ message: "Order successfully cancelled" });
-    } catch (err) {
-        console.error("Cancellation Error:", err);
-        res.status(500).json({ error: "Failed to cancel order" });
-    }
+    await Order.findByIdAndDelete(req.params.id);
+    const formattedTotal = orderToCancel.total.toLocaleString('en-IN');
+    
+    const mailOptions = {
+      to: process.env.ADMIN_EMAIL,
+      subject: `Order Cancelled: ₹${formattedTotal} by ${orderToCancel.email}`,
+      html: `<h2>Cancellation Alert</h2><p><b>User:</b> ${orderToCancel.email}</p><p><b>Refund:</b> ₹${formattedTotal}</p>`
+    };
+    
+    sendEmail(mailOptions, "CANCELLATION ALERT");
+    res.json({ message: "Success" });
+  } catch (err) {
+    res.status(500).json({ error: "Cancellation failed" });
+  }
 });
 
 const PORT = process.env.PORT || 5000;
