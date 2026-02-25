@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { Toaster, toast } from 'react-hot-toast';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import Home from './pages/Home';
@@ -15,16 +16,24 @@ import Profile from './pages/Profile';
 
 function App() {
   const [products, setProducts] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [cart, setCart] = useState([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [token, setToken] = useState(localStorage.getItem('token'));
   const [isAdmin, setIsAdmin] = useState(localStorage.getItem('isAdmin') === 'true');
 
-  const fetchProducts = () => {
-    axios.get(`${import.meta.env.VITE_API_URL}/api/products`)
-      .then(res => setProducts(res.data))
-      .catch(err => console.error("Fetch Error:", err));
+  const fetchProducts = async () => {
+    setIsLoading(true);
+    try {
+      const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/products`);
+      setProducts(res.data);
+    } catch (err) {
+      console.error("Fetch Error:", err);
+      toast.error("Failed to load products");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -41,7 +50,9 @@ function App() {
       }
       return [...prevCart, { ...product, quantity }];
     });
-    setIsCartOpen(true);
+    
+    // 🚀 We keep the toast notification, but we REMOVED the code that forces the cart open!
+    toast.success(`${product.name} added to cart!`); 
   };
 
   const updateQuantity = (id, delta) => {
@@ -56,6 +67,7 @@ function App() {
 
   const removeFromCart = (id) => {
     setCart((prevCart) => prevCart.filter((item) => item._id !== id));
+    toast.error("Item removed from cart", { icon: '🗑️' });
   };
 
   const logout = () => {
@@ -65,12 +77,14 @@ function App() {
 
     setToken(null);
     setIsAdmin(false);
+    toast.success("Logged out successfully");
     window.location.href = "/";
   };
 
   return (
     <BrowserRouter>
-      {/* 🚀 Updated wrapper background to gray-50 */}
+      <Toaster position="bottom-right" toastOptions={{ duration: 3000, style: { borderRadius: '10px', background: '#333', color: '#fff' } }} />
+      
       <div className="min-h-screen bg-gray-50 flex flex-col font-sans">
         <Navbar 
           cart={cart} 
@@ -90,6 +104,7 @@ function App() {
           <Route path="/" element={
             <Home 
               products={products} 
+              isLoading={isLoading}
               addToCart={addToCart} 
               fetchProducts={fetchProducts} 
               searchTerm={searchTerm} 

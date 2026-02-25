@@ -1,25 +1,31 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { toast } from 'react-hot-toast'; // 🚀 TOAST IMPORT
 
-const Home = ({ products = [], addToCart, searchTerm }) => {
+const Home = ({ products = [], isLoading, addToCart, searchTerm }) => {
   const [index, setIndex] = useState(0);
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [unitCounts, setUnitCounts] = useState({});
-  // 🚀 State to track which product's "Know More" section is open
   const [expandedId, setExpandedId] = useState(null); 
+  
+  // 🚀 NEW FEATURES STATE
+  const [sortOrder, setSortOrder] = useState("default");
+  const [wishlist, setWishlist] = useState(() => {
+    const saved = localStorage.getItem('technologia_wishlist');
+    return saved ? JSON.parse(saved) : [];
+  });
   
   const words = ["Laptops", "Drones", "VR Gear", "Consoles", "Smart Home"];
 
-  // 🚀 FIXED: Highly reliable transparent PNG links
   const bannerImages = [
     "https://pngimg.com/uploads/macbook/macbook_PNG65.png",                               
     "https://pngimg.com/uploads/drone/drone_PNG204.png",                                  
-    "https://file.aiquickdraw.com/imgcompressed/img/compressed_5733db2c0bdb304c4f8c5863b04e3c4c.webp", // VR Gear (Reliable PNG)
+    "https://file.aiquickdraw.com/imgcompressed/img/compressed_5733db2c0bdb304c4f8c5863b04e3c4c.webp",
     "https://pngimg.com/uploads/gamepad/gamepad_PNG62.png",                               
-    "https://m.media-amazon.com/images/I/61fB9i7y81L.png"               // Smart Home (Reliable PNG)
+    "https://m.media-amazon.com/images/I/61fB9i7y81L.png"               
   ];
 
-  // Single Master Timer: Changes both word and image together every 3.5 seconds
+
   useEffect(() => {
     const masterTimer = setInterval(() => {
       setIndex((prev) => (prev + 1) % words.length);
@@ -32,14 +38,35 @@ const Home = ({ products = [], addToCart, searchTerm }) => {
     if (shopSection) shopSection.scrollIntoView({ behavior: 'smooth' });
   };
 
+  // 🚀 WISHLIST TOGGLE LOGIC
+  const toggleWishlist = (id) => {
+    let updatedWishlist;
+    if (wishlist.includes(id)) {
+      updatedWishlist = wishlist.filter(itemId => itemId !== id);
+      toast("Removed from wishlist", { icon: '💔' });
+    } else {
+      updatedWishlist = [...wishlist, id];
+      toast.success("Added to wishlist!", { icon: '❤️' });
+    }
+    setWishlist(updatedWishlist);
+    localStorage.setItem('technologia_wishlist', JSON.stringify(updatedWishlist));
+  };
+
   const safeProducts = Array.isArray(products) ? products : [];
   const categories = ["All", ...new Set(safeProducts.map(p => p.category))];
 
-  const filteredProducts = safeProducts.filter(p => {
+  // 🚀 FILTERING AND SORTING LOGIC
+  let displayProducts = safeProducts.filter(p => {
     const matchesSearch = p.name?.toLowerCase().includes((searchTerm || "").toLowerCase());
     const matchesCategory = selectedCategory === "All" || p.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
+
+  if (sortOrder === "low-high") {
+    displayProducts.sort((a, b) => a.price - b.price);
+  } else if (sortOrder === "high-low") {
+    displayProducts.sort((a, b) => b.price - a.price);
+  }
 
   const handleUnitChange = (id, delta) => {
     setUnitCounts(prev => {
@@ -52,74 +79,37 @@ const Home = ({ products = [], addToCart, searchTerm }) => {
   return (
     <div className="bg-slate-50 min-h-screen text-gray-900 font-sans overflow-x-hidden">
       
-      {/* 🚀 1. THE ROYAL BLUE GRADIENT BANNER SECTION */}
+      {/* 🚀 HERO SECTION (Unchanged for brevity, keep your exact Hero section code here) */}
       <section className="relative h-screen flex items-center justify-center overflow-hidden bg-gradient-to-br from-blue-900 via-indigo-900 to-blue-950">
-        
-        {/* Animated Background Glowing Orbs */}
         <div className="absolute inset-0 z-0 overflow-hidden">
-          <motion.div 
-            animate={{ scale: [1, 1.2, 1], x: [0, 80, 0], y: [0, -40, 0] }} 
-            transition={{ duration: 15, repeat: Infinity, ease: "easeInOut" }} 
-            className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-blue-500/30 blur-[120px] rounded-full" 
-          />
-          <motion.div 
-            animate={{ scale: [1.2, 1, 1.2], x: [0, -80, 0], y: [0, 80, 0] }} 
-            transition={{ duration: 20, repeat: Infinity, ease: "easeInOut" }} 
-            className="absolute bottom-[-10%] right-[-10%] w-[600px] h-[600px] bg-cyan-400/20 blur-[120px] rounded-full" 
-          />
+          <motion.div animate={{ scale: [1, 1.2, 1], x: [0, 80, 0], y: [0, -40, 0] }} transition={{ duration: 15, repeat: Infinity, ease: "easeInOut" }} className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-blue-500/30 blur-[120px] rounded-full" />
+          <motion.div animate={{ scale: [1.2, 1, 1.2], x: [0, -80, 0], y: [0, 80, 0] }} transition={{ duration: 20, repeat: Infinity, ease: "easeInOut" }} className="absolute bottom-[-10%] right-[-10%] w-[600px] h-[600px] bg-cyan-400/20 blur-[120px] rounded-full" />
         </div>
-
-        {/* Floating tech particles (dots) */}
         <div className="absolute inset-0 z-0 opacity-20" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize: '40px 40px' }}></div>
-
         <div className="container mx-auto px-6 z-20 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center h-full">
           <div className="text-left pt-10">
             <motion.div initial={{ opacity: 0, x: -50 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.8 }}>
-              <h1 className="text-6xl md:text-8xl font-black tracking-tighter leading-none mb-4 text-white drop-shadow-lg">
-                For you <br/> we have
-              </h1>
-              
+              <h1 className="text-6xl md:text-8xl font-black tracking-tighter leading-none mb-4 text-white drop-shadow-lg">For you <br/> we have</h1>
               <div className="h-[120px] flex items-center">
                 <AnimatePresence mode="wait">
-                  <motion.span 
-                    key={index} 
-                    initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -20, opacity: 0 }} transition={{ duration: 0.4 }}
-                    className="block text-6xl md:text-8xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 to-blue-200 drop-shadow-md"
-                  >
+                  <motion.span key={index} initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -20, opacity: 0 }} transition={{ duration: 0.4 }} className="block text-6xl md:text-8xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 to-blue-200 drop-shadow-md">
                     {words[index]}
                   </motion.span>
                 </AnimatePresence>
               </div>
-
-              <motion.p 
-                initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}
-                className="mt-8 text-xl text-blue-100 max-w-lg leading-relaxed border-l-4 border-cyan-400 pl-6 bg-white/10 backdrop-blur-md p-4 rounded-r-2xl shadow-xl border-y border-r border-white/20"
-              >
+              <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }} className="mt-8 text-xl text-blue-100 max-w-lg leading-relaxed border-l-4 border-cyan-400 pl-6 bg-white/10 backdrop-blur-md p-4 rounded-r-2xl shadow-xl border-y border-r border-white/20">
                 Premium gadgets delivered to your doorstep. Fill your cart and experience the future.
               </motion.p>
-
               <div className="mt-10">
-                <button onClick={scrollToShop} className="bg-white text-blue-900 px-10 py-4 rounded-full font-black text-xl hover:bg-cyan-50 hover:scale-105 transition-all shadow-xl hover:shadow-cyan-500/50">
-                  Shop Now
-                </button>
+                <button onClick={scrollToShop} className="bg-white text-blue-900 px-10 py-4 rounded-full font-black text-xl hover:bg-cyan-50 hover:scale-105 transition-all shadow-xl hover:shadow-cyan-500/50">Shop Now</button>
               </div>
             </motion.div>
           </div>
-
           <div className="hidden lg:flex justify-center items-center relative h-[600px] w-full">
             <div className="absolute w-[450px] h-[450px] bg-blue-300/10 blur-[60px] rounded-full z-0" />
             <motion.div className="relative z-20 w-full max-w-lg flex justify-center items-center h-[450px]">
               <AnimatePresence mode="wait">
-                <motion.img 
-                  key={index} 
-                  src={bannerImages[index]} 
-                  alt={words[index]}
-                  className="absolute w-[85%] h-[85%] object-contain drop-shadow-[0_20px_40px_rgba(0,0,0,0.6)]"
-                  initial={{ opacity: 0, x: 80, scale: 0.9, rotateY: 15 }}
-                  animate={{ opacity: 1, x: 0, scale: 1.25, rotateY: 0 }}
-                  exit={{ opacity: 0, x: -80, scale: 0.9, rotateY: -15 }}
-                  transition={{ duration: 0.7, ease: [0.25, 0.1, 0.25, 1] }}
-                />
+                <motion.img key={index} src={bannerImages[index]} alt={words[index]} className="absolute w-[85%] h-[85%] object-contain drop-shadow-[0_20px_40px_rgba(0,0,0,0.6)]" initial={{ opacity: 0, x: 80, scale: 0.9, rotateY: 15 }} animate={{ opacity: 1, x: 0, scale: 1.25, rotateY: 0 }} exit={{ opacity: 0, x: -80, scale: 0.9, rotateY: -15 }} transition={{ duration: 0.7, ease: [0.25, 0.1, 0.25, 1] }}/>
               </AnimatePresence>
             </motion.div>
           </div>
@@ -129,10 +119,24 @@ const Home = ({ products = [], addToCart, searchTerm }) => {
       {/* 🚀 2. THE DISTINCT WHITE CARDS SECTION */}
       <div id="shop-section" className="relative z-30 bg-slate-100 py-24 border-t border-slate-200 shadow-[inset_0_10px_30px_rgba(0,0,0,0.02)]">
         <div className="container mx-auto px-6">
-          <div className="flex flex-col md:flex-row justify-between items-end mb-12 pb-6 border-b border-slate-200">
+          
+          <div className="flex flex-col md:flex-row justify-between items-end mb-8 pb-6 border-b border-slate-200">
             <div>
                <p className="text-blue-600 font-bold uppercase tracking-[0.2em] mb-2 drop-shadow-sm">Inventory</p>
                <h2 className="text-5xl font-black text-gray-900">Latest Drops</h2>
+            </div>
+            
+            {/* 🚀 ADDED: SORTING DROPDOWN */}
+            <div className="mt-6 md:mt-0">
+              <select 
+                value={sortOrder} 
+                onChange={(e) => setSortOrder(e.target.value)}
+                className="bg-white border border-slate-300 text-slate-700 font-bold py-3 px-6 rounded-full shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none cursor-pointer"
+              >
+                <option value="default">Sort by: Default</option>
+                <option value="low-high">Price: Low to High</option>
+                <option value="high-low">Price: High to Low</option>
+              </select>
             </div>
           </div>
 
@@ -151,13 +155,26 @@ const Home = ({ products = [], addToCart, searchTerm }) => {
             ))}
           </div>
 
-          {filteredProducts.length === 0 ? (
+          {/* 🚀 ADDED: LOADING SKELETONS */}
+          {isLoading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+              {[...Array(8)].map((_, i) => (
+                <div key={i} className="animate-pulse bg-white p-5 rounded-[2rem] shadow-sm flex flex-col h-[420px] border border-slate-100">
+                  <div className="h-64 bg-slate-200 rounded-2xl mb-6"></div>
+                  <div className="h-4 bg-slate-200 rounded w-1/4 mb-4"></div>
+                  <div className="h-6 bg-slate-200 rounded w-3/4 mb-auto"></div>
+                  <div className="h-10 bg-slate-200 rounded-2xl w-full mt-4"></div>
+                </div>
+              ))}
+            </div>
+          ) : displayProducts.length === 0 ? (
              <div className="text-center py-20 opacity-50"><h3 className="text-2xl font-bold">No products found.</h3></div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-              {filteredProducts.map(product => {
+              {displayProducts.map(product => {
                 const units = unitCounts[product._id] || 1;
                 const isStocked = product.inStock !== false;
+                const isWishlisted = wishlist.includes(product._id);
 
                 return (
                  <motion.div
@@ -166,9 +183,17 @@ const Home = ({ products = [], addToCart, searchTerm }) => {
                   viewport={{ once: true, margin: "-50px" }} 
                   whileHover={{ y: -8 }}
                   key={product._id}
-                  className="bg-white p-5 rounded-[2rem] shadow-lg hover:shadow-2xl transition-all duration-300 flex flex-col border border-white/60"
+                  className="bg-white p-5 rounded-[2rem] shadow-lg hover:shadow-2xl transition-all duration-300 flex flex-col border border-white/60 relative"
                  >
-                  <div className="h-64 flex items-center justify-center mb-6 bg-slate-50 rounded-2xl p-4 overflow-hidden border border-slate-100 group">
+                  {/* 🚀 ADDED: WISHLIST HEART ICON */}
+                  <button 
+                    onClick={() => toggleWishlist(product._id)}
+                    className="absolute top-8 right-8 z-10 p-2 bg-white/80 backdrop-blur-md rounded-full shadow-sm hover:scale-110 transition-transform"
+                  >
+                    {isWishlisted ? '❤️' : '🤍'}
+                  </button>
+
+                  <div className="h-64 flex items-center justify-center mb-6 bg-slate-50 rounded-2xl p-4 overflow-hidden border border-slate-100 group relative">
                     <motion.img 
                       whileHover={{ scale: 1.1 }} 
                       transition={{ duration: 0.4 }} 
@@ -182,7 +207,6 @@ const Home = ({ products = [], addToCart, searchTerm }) => {
                     <p className="text-xs text-blue-600 font-bold uppercase tracking-wider mb-2">{product.category}</p>
                     <h3 className="font-bold text-xl text-gray-900 mb-1 line-clamp-2 leading-tight">{product.name}</h3>
                     
-                    {/* 🚀 Toggle Button */}
                     <button 
                       onClick={() => setExpandedId(expandedId === product._id ? null : product._id)}
                       className="text-sm text-blue-600 font-semibold hover:underline text-left mb-4 w-max"

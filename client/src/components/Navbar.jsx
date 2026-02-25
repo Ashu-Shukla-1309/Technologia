@@ -1,16 +1,35 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react'; // 🚀 Imported useEffect and useRef
 import axios from 'axios';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import CheckoutModal from './CheckoutModal';
 
 const Navbar = ({ cart, removeFromCart, updateQuantity, isOpen, setIsOpen, clearCart, searchTerm, setSearchTerm, token, isAdmin, logout }) => {
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
   
+  const navigate = useNavigate();
+  // 🚀 ADDED: Ref to detect clicks outside the profile dropdown
+  const dropdownRef = useRef(null); 
+  
   const total = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
   
   const userEmail = localStorage.getItem('userEmail') || "User";
+
+  // 🚀 ADDED: Event listener to close dropdown when clicking anywhere else on the screen
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      // If the dropdown is open AND the click was outside the dropdown container -> Close it!
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsProfileDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   const handleCheckoutSubmit = async (orderData) => {
     try {
@@ -28,8 +47,14 @@ const Navbar = ({ cart, removeFromCart, updateQuantity, isOpen, setIsOpen, clear
   };
 
   const initiateCheckout = () => {
-    setIsOpen(false); 
-    setIsCheckoutOpen(true);
+    if (!token) {
+      alert("Please log in or sign up to place an order.");
+      setIsOpen(false);
+      navigate('/login'); 
+    } else {
+      setIsOpen(false); 
+      setIsCheckoutOpen(true);
+    }
   };
 
   return (
@@ -52,7 +77,8 @@ const Navbar = ({ cart, removeFromCart, updateQuantity, isOpen, setIsOpen, clear
 
           <div className="flex items-center gap-6">
             {token ? (
-              <div className="relative">
+              // 🚀 ADDED ref={dropdownRef} to this wrapper div
+              <div className="relative" ref={dropdownRef}>
                 <button 
                   onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
                   className="flex items-center gap-2 hover:bg-gray-50 pr-4 pl-2 py-1 rounded-full transition-all border border-transparent hover:border-gray-200"
@@ -73,10 +99,10 @@ const Navbar = ({ cart, removeFromCart, updateQuantity, isOpen, setIsOpen, clear
                         <p className="text-sm font-bold text-gray-900 truncate">{userEmail}</p>
                      </div>
                      {isAdmin && (
-                       <Link to="/add" className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition">Inventory Management</Link>
+                       <Link onClick={() => setIsProfileDropdownOpen(false)} to="/add" className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition">Inventory Management</Link>
                      )}
-                     <Link to="/profile" className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition">My Profile</Link>
-                     <Link to="/orders" className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition">Order History</Link>
+                     <Link onClick={() => setIsProfileDropdownOpen(false)} to="/profile" className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition">My Profile</Link>
+                     <Link onClick={() => setIsProfileDropdownOpen(false)} to="/orders" className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition">Order History</Link>
                      <div className="border-t border-gray-100 mt-2 pt-2">
                        <button onClick={logout} className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition">Sign Out</button>
                      </div>
