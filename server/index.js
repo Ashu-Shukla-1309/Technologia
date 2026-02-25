@@ -66,7 +66,9 @@ const Product = mongoose.model('Product', new mongoose.Schema({
   name: String, 
   price: Number, 
   image: String, 
-  category: String
+  category: String,
+  description: String,
+  inStock: { type: Boolean, default: true }
 }));
 
 const Order = mongoose.model('Order', new mongoose.Schema({
@@ -172,7 +174,7 @@ app.post('/api/auth/forgot-password', async (req, res) => {
     if (!user) return res.status(404).json({ error: "User not found" });
 
     const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
-    await Otp.findOneAndUpdate({ email }, { code: resetCode }, { upsert: true, returnDocument: 'after' });
+    await Otp.findOneAndUpdate({ email }, { code: verificationCode }, { upsert: true, returnDocument: 'after' });
 
     const mailOptions = {
       to: email,
@@ -265,6 +267,20 @@ app.post('/api/products', async (req, res) => {
     const newProduct = new Product(req.body);
     await newProduct.save();
     res.json(newProduct);
+});
+
+// 🚀 NEW: Route to update an existing product
+app.put('/api/products/:id', async (req, res) => {
+  try {
+    const updatedProduct = await Product.findByIdAndUpdate(
+      req.params.id, 
+      req.body, 
+      { new: true } 
+    );
+    res.json(updatedProduct);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to update product" });
+  }
 });
 
 app.delete('/api/products/:id', async (req, res) => {
@@ -361,7 +377,7 @@ app.get('/api/orders', async (req, res) => {
   res.json(await Order.find(filter).sort({ date: -1 }));
 });
 
-// 🚀 NEW: Admin route to update order status
+// Admin route to update order status
 app.put('/api/orders/:id/status', async (req, res) => {
   try {
     const { status, adminEmail } = req.body;
