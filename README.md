@@ -5,6 +5,8 @@ Welcome to **Technologia**! This is a complete, modern website (a "Single Page A
 
 We built this using the **MERN Stack** (MongoDB, Express, React, Node.js) and made it lightning-fast using a tool called **Vite**.
 
+Check out the deployed website:- https://technologia-ibm.vercel.app/
+
 ---
 
 ## 📑 Table of Contents
