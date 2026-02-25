@@ -13,6 +13,7 @@ import VerifyOTP from './pages/VerifyOTP';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import Profile from './pages/Profile';
+import Wishlist from './pages/Wishlist';
 
 function App() {
   const [products, setProducts] = useState([]);
@@ -116,6 +117,7 @@ function App() {
           <Route path="/verify" element={<VerifyOTP />} />
           <Route path="/orders" element={<Orders />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/wishlist" element={<Wishlist products={products} addToCart={addToCart} />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/profile" element={token ? <Profile logout={logout} /> : <Navigate to="/login" />} />
           <Route path="/add" element={isAdmin ? <AddProduct fetchProducts={fetchProducts} /> : <Navigate to="/" />} />

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'; // 🚀 Imported useEffect and useRef
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { Link, useNavigate } from 'react-router-dom';
 import CheckoutModal from './CheckoutModal';
@@ -8,7 +8,6 @@ const Navbar = ({ cart, removeFromCart, updateQuantity, isOpen, setIsOpen, clear
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
   
   const navigate = useNavigate();
-  // 🚀 ADDED: Ref to detect clicks outside the profile dropdown
   const dropdownRef = useRef(null); 
   
   const total = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
@@ -16,10 +15,9 @@ const Navbar = ({ cart, removeFromCart, updateQuantity, isOpen, setIsOpen, clear
   
   const userEmail = localStorage.getItem('userEmail') || "User";
 
-  // 🚀 ADDED: Event listener to close dropdown when clicking anywhere else on the screen
+  // 🚀 Event listener to close dropdown when clicking anywhere else on the screen
   useEffect(() => {
     const handleClickOutside = (event) => {
-      // If the dropdown is open AND the click was outside the dropdown container -> Close it!
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setIsProfileDropdownOpen(false);
       }
@@ -75,9 +73,10 @@ const Navbar = ({ cart, removeFromCart, updateQuantity, isOpen, setIsOpen, clear
             />
           </div>
 
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-4 md:gap-6">
+            
+            {/* --- USER PROFILE / LOGIN SECTION --- */}
             {token ? (
-              // 🚀 ADDED ref={dropdownRef} to this wrapper div
               <div className="relative" ref={dropdownRef}>
                 <button 
                   onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
@@ -116,18 +115,27 @@ const Navbar = ({ cart, removeFromCart, updateQuantity, isOpen, setIsOpen, clear
               </div>
             )}
 
-            <button onClick={() => setIsOpen(true)} className="relative p-2 hover:bg-gray-100 rounded-full transition-all group">
-              <span className="text-2xl">🛍️</span>
-              {totalItems > 0 && (
-                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full border-2 border-white shadow-sm">
-                  {totalItems}
-                </span>
-              )}
-            </button>
+            {/* --- ICONS SECTION (Wishlist & Cart) --- */}
+            <div className="flex items-center gap-2 border-l border-gray-200 pl-4 md:pl-6">
+              <Link to="/wishlist" title="Wishlist" className="relative p-2 hover:bg-gray-100 rounded-full transition-all flex items-center justify-center">
+                <span className="text-2xl">❤️</span>
+              </Link>
+
+              <button onClick={() => setIsOpen(true)} title="Cart" className="relative p-2 hover:bg-gray-100 rounded-full transition-all group">
+                <span className="text-2xl">🛍️</span>
+                {totalItems > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full border-2 border-white shadow-sm">
+                    {totalItems}
+                  </span>
+                )}
+              </button>
+            </div>
+
           </div>
         </div>
       </nav>
 
+      {/* --- CART SIDEBAR --- */}
       {isOpen && <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm z-40" onClick={() => setIsOpen(false)}></div>}
       
       <div className={`fixed top-0 right-0 h-full w-85 md:w-96 bg-gray-50 text-gray-900 shadow-2xl z-50 transform transition-transform duration-300 ease-in-out flex flex-col border-l border-gray-200 ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}>
@@ -164,6 +172,7 @@ const Navbar = ({ cart, removeFromCart, updateQuantity, isOpen, setIsOpen, clear
         )}
       </div>
 
+      {/* --- CHECKOUT MODAL --- */}
       <CheckoutModal 
         isOpen={isCheckoutOpen} 
         onClose={() => setIsCheckoutOpen(false)} 
