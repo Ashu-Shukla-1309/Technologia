@@ -10,13 +10,9 @@ const axios = require('axios');
 
 const app = express();
 
-// Trust the proxy to ensure rate limiting works correctly on cloud deployment
 app.set('trust proxy', 1);
-
-// Standard security headers to prevent common web vulnerabilities
 app.use(helmet()); 
 
-// Dynamic CORS configuration allowing local testing and the live Vercel frontend
 app.use(cors({ 
   origin: [
     'http://localhost:5173', 
@@ -26,11 +22,9 @@ app.use(cors({
   credentials: true 
 }));
 
-// Limit body size to prevent large payload attacks
 app.use(express.json({ limit: '10kb' })); 
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 
-// Custom middleware to sanitize incoming data and prevent NoSQL injection attacks
 app.use((req, res, next) => {
   const sanitize = (obj) => {
     if (obj instanceof Object) {
@@ -49,19 +43,16 @@ app.use((req, res, next) => {
   next();
 });
 
-// Protect authentication routes from brute force attacks
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, 
   max: 20,
   message: { error: "Security alert: Too many attempts. Please try again later." }
 });
 
-// Connect to MongoDB Atlas using the connection string in environment variables
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log("Shielded DB Connected Successfully"))
   .catch(err => console.error("Database Connection Error:", err));
 
-// Schema definitions for products, orders, users, and OTP codes
 const Product = mongoose.model('Product', new mongoose.Schema({
   name: String, 
   price: Number, 
@@ -71,6 +62,7 @@ const Product = mongoose.model('Product', new mongoose.Schema({
   inStock: { type: Boolean, default: true }
 }));
 
+// 🚀 UPDATED SCHEMA: Added cancelReason and cancelDate
 const Order = mongoose.model('Order', new mongoose.Schema({
   email: String, 
   customerName: String, 
@@ -81,7 +73,9 @@ const Order = mongoose.model('Order', new mongoose.Schema({
   date: { type: Date, default: Date.now },
   paymentMethod: String, 
   transactionId: String,
-  status: { type: String, default: 'Processing' } 
+  status: { type: String, default: 'Processing' },
+  cancelReason: String, 
+  cancelDate: Date      
 }));
 
 const User = mongoose.model('User', new mongoose.Schema({
@@ -96,7 +90,6 @@ const Otp = mongoose.model('Otp', new mongoose.Schema({
   createdAt: { type: Date, expires: 300, default: Date.now } 
 }));
 
-// Primary function to send emails using Brevo REST API
 const sendEmail = async (mailOptions, logTitle) => {
   try {
     const senderEmail = process.env.EMAIL_USER;
@@ -127,7 +120,6 @@ const sendEmail = async (mailOptions, logTitle) => {
 
 app.use('/api/auth/', authLimiter);
 
-// Handle new user registration and generate verification code
 app.post('/api/auth/register', async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -165,7 +157,6 @@ app.post('/api/auth/register', async (req, res) => {
   }
 });
 
-// Trigger password reset workflow
 app.post('/api/auth/forgot-password', async (req, res) => {
   try {
     const { email } = req.body;
@@ -174,7 +165,7 @@ app.post('/api/auth/forgot-password', async (req, res) => {
     if (!user) return res.status(404).json({ error: "User not found" });
 
     const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
-    await Otp.findOneAndUpdate({ email }, { code: verificationCode }, { upsert: true, returnDocument: 'after' });
+    await Otp.findOneAndUpdate({ email }, { code: resetCode }, { upsert: true, returnDocument: 'after' });
 
     const mailOptions = {
       to: email,
@@ -191,7 +182,6 @@ app.post('/api/auth/forgot-password', async (req, res) => {
   }
 });
 
-// Validate the OTP provided by the user
 app.post('/api/auth/verify-otp', async (req, res) => {
   try {
     const { email, otp } = req.body;
@@ -208,7 +198,6 @@ app.post('/api/auth/verify-otp', async (req, res) => {
   }
 });
 
-// Update password after OTP is successfully verified
 app.post('/api/auth/reset-password', async (req, res) => {
   try {
     const { email, otp, newPassword } = req.body;
@@ -230,7 +219,6 @@ app.post('/api/auth/reset-password', async (req, res) => {
   }
 });
 
-// Standard login with JWT token generation
 app.post('/api/auth/login', async (req, res) => {
   const { email, password } = req.body;
   try {
@@ -253,7 +241,6 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-// Inventory management routes
 app.get('/api/products', async (req, res) => {
   try {
     const products = await Product.find();
@@ -269,7 +256,6 @@ app.post('/api/products', async (req, res) => {
     res.json(newProduct);
 });
 
-// 🚀 NEW: Route to update an existing product
 app.put('/api/products/:id', async (req, res) => {
   try {
     const updatedProduct = await Product.findByIdAndUpdate(
@@ -292,7 +278,6 @@ app.delete('/api/products/:id', async (req, res) => {
     }
 });
 
-// Process new orders and send formatted HTML admin notifications
 app.post('/api/orders', async (req, res) => {
   try {
     const { email, customerName, phone, address, items, total, paymentMethod, transactionId } = req.body;
@@ -356,13 +341,6 @@ app.post('/api/orders', async (req, res) => {
     
     sendEmail(mailOptions, "NEW ORDER NOTIFICATION");
 
-    console.log(`\nNew Transaction Logged`);
-    console.log(`-------------------------`);
-    console.log(`Customer: ${customerName}`);
-    console.log(`Total:    ₹${formattedTotal}`);
-    console.log(`Items:    ${items.length} units`);
-    console.log(`-------------------------\n`);
-
     res.json(newOrder);
   } catch (err) {
     console.error("Order Creation Error:", err);
@@ -370,14 +348,12 @@ app.post('/api/orders', async (req, res) => {
   }
 });
 
-// Retrieve order history for a specific user
 app.get('/api/orders', async (req, res) => {
   const { email } = req.query;
   const filter = email ? { email: email.toLowerCase() } : {};
   res.json(await Order.find(filter).sort({ date: -1 }));
 });
 
-// Admin route to update order status
 app.put('/api/orders/:id/status', async (req, res) => {
   try {
     const { status, adminEmail } = req.body;
@@ -397,38 +373,99 @@ app.put('/api/orders/:id/status', async (req, res) => {
   }
 });
 
-// Handle order cancellations and notify the admin with refund details
-app.delete('/api/orders/:id', async (req, res) => {
-    try {
-        const order = await Order.findById(req.params.id);
-        if (!order) return res.status(404).json({ error: "Order record not found" });
+app.post('/api/orders/:id/return', async (req, res) => {
+  try {
+    const { type, reason, userEmail } = req.body;
+    const order = await Order.findById(req.params.id);
+    
+    if (!order) return res.status(404).json({ error: "Order not found" });
 
-        await Order.findByIdAndDelete(req.params.id);
+    order.status = `Return Requested (${type})`;
+    await order.save();
+
+    const formattedTotal = order.total.toLocaleString('en-IN');
+
+    const mailOptions = {
+      to: process.env.ADMIN_EMAIL,
+      subject: `Action Required: ${type} Request | Order #${order._id.toString().slice(-6).toUpperCase()}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #f59e0b; border-radius: 12px; overflow: hidden;">
+          <div style="background-color: #f59e0b; padding: 20px; text-align: center;">
+            <h1 style="color: #ffffff; margin: 0; font-size: 24px; letter-spacing: 2px;">TECHNOLOGIA</h1>
+            <p style="color: #fffbeb; margin: 5px 0 0 0; font-weight: bold;">RETURN / REPLACE REQUEST</p>
+          </div>
+          <div style="padding: 30px; background-color: #ffffff;">
+            <p style="color: #475569; line-height: 1.6;">
+              <strong>Customer Email:</strong> ${userEmail}<br>
+              <strong>Order ID:</strong> ${order._id}<br>
+              <strong>Request Type:</strong> <span style="color: #d97706; font-weight: bold;">${type}</span><br>
+              <strong>Total Value:</strong> ₹${formattedTotal}
+            </p>
+            <div style="margin-top: 20px; padding: 20px; border-left: 4px solid #f59e0b; background-color: #fffbeb;">
+              <h3 style="margin-top: 0; color: #b45309;">Customer's Reason:</h3>
+              <p style="margin: 0; color: #78350f; font-style: italic;">"${reason}"</p>
+            </div>
+            <p style="margin-top: 20px; color: #475569;">Please log in to the Admin Panel to update the order status and process this request.</p>
+          </div>
+        </div>
+      `
+    };
+    
+    sendEmail(mailOptions, "RETURN REQUEST NOTIFICATION");
+    res.json({ message: "Return request sent successfully", order });
+  } catch (err) {
+    console.error("Return Request Error:", err);
+    res.status(500).json({ error: "Failed to process return request" });
+  }
+});
+
+// 🚀 NEW/UPDATED: Cancel Order Endpoint (Replaces the old DELETE route)
+app.post('/api/orders/:id/cancel', async (req, res) => {
+    try {
+        const { reason } = req.body;
+        const order = await Order.findById(req.params.id);
+        
+        if (!order) return res.status(404).json({ error: "Order record not found" });
+        if (order.status === "Cancelled") return res.status(400).json({ error: "Order is already cancelled" });
+
+        // Update instead of delete
+        order.status = "Cancelled";
+        order.cancelReason = reason;
+        order.cancelDate = new Date();
+        await order.save();
 
         const formattedTotal = order.total.toLocaleString('en-IN');
+        const formattedDate = order.cancelDate.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
         
+        // Detailed Email sent to your Admin Gmail
         const mailOptions = {
           to: process.env.ADMIN_EMAIL,
-          subject: `Action Required: Cancellation Refund | ₹${formattedTotal}`,
+          subject: `Alert: Order Cancelled by User | ₹${formattedTotal}`,
           html: `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #fee2e2; border-radius: 12px; overflow: hidden;">
               <div style="background-color: #ef4444; padding: 20px; text-align: center;">
                 <h1 style="color: #ffffff; margin: 0; font-size: 24px; letter-spacing: 2px;">TECHNOLOGIA</h1>
-                <p style="color: #fca5a5; margin: 5px 0 0 0; font-weight: bold;">CANCELLATION ALERT</p>
+                <p style="color: #fca5a5; margin: 5px 0 0 0; font-weight: bold;">USER CANCELLED ORDER</p>
               </div>
               
               <div style="padding: 30px; background-color: #ffffff;">
-                <h2 style="color: #7f1d1d;">Action Required: Refund Processing</h2>
-                <p style="color: #475569; line-height: 1.6;">A customer has just cancelled their order. Please process the refund to their original payment method.</p>
+                <h2 style="color: #7f1d1d; margin-top: 0;">Cancellation Details</h2>
+                <p style="color: #475569; line-height: 1.6;">A customer has just cancelled their order. Please review the details below to process any necessary refunds.</p>
                 
-                <div style="margin-top: 20px; padding: 20px; border-left: 4px solid #ef4444; background-color: #fef2f2;">
-                  <p style="margin: 0 0 10px 0; color: #991b1b;"><strong>Order ID:</strong> ${order._id}</p>
-                  <p style="margin: 0 0 10px 0; color: #991b1b;"><strong>Customer Email:</strong> ${order.email}</p>
-                  <p style="margin: 0 0 10px 0; color: #991b1b;"><strong>Payment Method used:</strong> ${order.paymentMethod}</p>
-                  <p style="margin: 0; color: #991b1b;"><strong>Transaction ID:</strong> ${order.transactionId || 'N/A'}</p>
+                <div style="margin-top: 20px; padding: 20px; border-left: 4px solid #ef4444; background-color: #fef2f2; color: #991b1b; line-height: 1.8;">
+                  <strong>Order ID:</strong> ${order._id}<br>
+                  <strong>Customer Name:</strong> ${order.customerName || 'N/A'}<br>
+                  <strong>Customer Email:</strong> ${order.email}<br>
+                  <strong>Status:</strong> <span style="color: #ef4444; font-weight: bold;">Cancelled</span><br>
+                  <strong>Date of Cancellation:</strong> ${formattedDate}<br>
+                  <strong>Reason:</strong> <span style="font-style: italic;">"${reason}"</span>
                 </div>
 
-                <h2 style="margin-top: 30px; color: #ef4444; text-align: center;">Refund Amount: ₹${formattedTotal}</h2>
+                <div style="margin-top: 25px; border-top: 2px solid #fee2e2; padding-top: 15px;">
+                  <p style="margin: 0 0 5px 0; color: #475569;"><strong>Payment Method used:</strong> ${order.paymentMethod}</p>
+                  <p style="margin: 0; color: #475569;"><strong>Transaction ID:</strong> ${order.transactionId || 'N/A'}</p>
+                  <h2 style="margin-top: 15px; color: #ef4444; text-align: right;">Refund Due: ₹${formattedTotal}</h2>
+                </div>
               </div>
             </div>
           `
@@ -436,13 +473,7 @@ app.delete('/api/orders/:id', async (req, res) => {
         
         sendEmail(mailOptions, "CANCELLATION ALERT");
 
-        console.log(`\nOrder Cancelled`);
-        console.log(`-------------------------`);
-        console.log(`Customer: ${order.customerName || 'N/A'}`);
-        console.log(`Refund:   ₹${formattedTotal}`);
-        console.log(`-------------------------\n`);
-
-        res.json({ message: "Order successfully cancelled" });
+        res.json({ message: "Order successfully cancelled", order });
     } catch (err) {
         console.error("Cancellation Error:", err);
         res.status(500).json({ error: "Failed to cancel order" });
