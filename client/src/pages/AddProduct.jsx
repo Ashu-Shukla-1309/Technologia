@@ -1,21 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
-import { toast } from 'react-hot-toast'; // 🚀 ADDED TOAST
+import { toast } from 'react-hot-toast';
 
 const AddProduct = ({ fetchProducts }) => {
   const [formData, setFormData] = useState({ name: '', price: '', category: 'Electronics', image: '', description: '', inStock: true });
   const [products, setProducts] = useState([]);
-  const [orders, setOrders] = useState([]); // 🚀 ADDED FOR ANALYTICS
+  const [orders, setOrders] = useState([]); 
   const [editingId, setEditingId] = useState(null); 
+
+  // 🛡️ SECURITY: Get the token and create a reusable config object for authenticated requests
+  const token = localStorage.getItem('token');
+  const authConfig = { headers: { Authorization: `Bearer ${token}` } };
 
   useEffect(() => { 
     refreshInventory(); 
-    fetchOrders(); // 🚀 FETCH ORDERS ON LOAD
+    fetchOrders(); 
   }, []);
 
   const refreshInventory = async () => {
     try {
+      // Fetching products is a public route, no token needed here
       const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/products`);
       setProducts(Array.isArray(res.data) ? res.data : []);
     } catch (err) { setProducts([]); }
@@ -23,7 +28,8 @@ const AddProduct = ({ fetchProducts }) => {
 
   const fetchOrders = async () => {
     try {
-      const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/orders`);
+      // 🛡️ SECURED: Needs token so the backend knows an Admin is asking for global orders
+      const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/orders`, authConfig);
       setOrders(res.data);
     } catch (err) { console.error(err); }
   };
@@ -38,17 +44,19 @@ const AddProduct = ({ fetchProducts }) => {
     const loadingToast = toast.loading(editingId ? "Updating product..." : "Adding to store...");
     try {
       if (editingId) {
-        await axios.put(`${import.meta.env.VITE_API_URL}/api/products/${editingId}`, formData);
+        // 🛡️ SECURED
+        await axios.put(`${import.meta.env.VITE_API_URL}/api/products/${editingId}`, formData, authConfig);
         toast.success('Product Updated Successfully!', { id: loadingToast });
       } else {
-        await axios.post(`${import.meta.env.VITE_API_URL}/api/products`, formData);
+        // 🛡️ SECURED
+        await axios.post(`${import.meta.env.VITE_API_URL}/api/products`, formData, authConfig);
         toast.success('Product Added Successfully!', { id: loadingToast });
       }
       resetForm();
       fetchProducts();
       refreshInventory();
     } catch (err) { 
-      toast.error(editingId ? 'Error updating product' : 'Error adding product', { id: loadingToast }); 
+      toast.error(err.response?.data?.error || (editingId ? 'Error updating product' : 'Error adding product'), { id: loadingToast }); 
     }
   };
 
@@ -68,24 +76,26 @@ const AddProduct = ({ fetchProducts }) => {
   const handleToggleStock = async (product) => {
     try {
       const updatedStock = !product.inStock;
-      await axios.put(`${import.meta.env.VITE_API_URL}/api/products/${product._id}`, { ...product, inStock: updatedStock });
+      // 🛡️ SECURED
+      await axios.put(`${import.meta.env.VITE_API_URL}/api/products/${product._id}`, { ...product, inStock: updatedStock }, authConfig);
       toast.success(updatedStock ? "Item marked In Stock" : "Item marked Out of Stock");
       refreshInventory();
       fetchProducts();
     } catch (err) {
-      toast.error("Failed to change stock status");
+      toast.error(err.response?.data?.error || "Failed to change stock status");
     }
   };
 
   const handleDelete = async (id) => {
     if (window.confirm("Are you sure you want to delete this product?")) {
       try {
-        await axios.delete(`${import.meta.env.VITE_API_URL}/api/products/${id}`);
+        // 🛡️ SECURED
+        await axios.delete(`${import.meta.env.VITE_API_URL}/api/products/${id}`, authConfig);
         if (editingId === id) resetForm(); 
         toast.success("Product deleted");
         refreshInventory(); 
         fetchProducts();
-      } catch (err) { toast.error("Failed to delete product"); }
+      } catch (err) { toast.error(err.response?.data?.error || "Failed to delete product"); }
     }
   };
 
@@ -94,7 +104,6 @@ const AddProduct = ({ fetchProducts }) => {
     setFormData({ name: '', price: '', category: 'Electronics', image: '', description: '', inStock: true });
   };
 
-  // 🚀 CALCULATE ANALYTICS
   const totalSales = orders.reduce((sum, order) => sum + order.total, 0);
   const totalOrders = orders.length;
   const safeProducts = Array.isArray(products) ? products : [];
@@ -103,7 +112,7 @@ const AddProduct = ({ fetchProducts }) => {
     <div className="min-h-screen bg-gray-50 text-gray-900 p-6 md:p-12 font-sans">
       <div className="max-w-6xl mx-auto">
         
-        {/* 🚀 ADMIN ANALYTICS DASHBOARD */}
+        {/* ADMIN ANALYTICS DASHBOARD */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-white p-6 rounded-3xl border border-gray-200 shadow-sm flex flex-col justify-center items-start">
             <p className="text-gray-500 font-bold text-sm uppercase tracking-wider mb-2">Total Sales</p>

@@ -80,9 +80,19 @@ const Navbar = ({ cart, removeFromCart, updateQuantity, isOpen, setIsOpen, clear
 
   const handleCheckoutSubmit = async (orderData) => {
     try {
-      await axios.post(`${import.meta.env.VITE_API_URL}/api/orders`, orderData);
+      const token = localStorage.getItem('token');
+      await axios.post(`${import.meta.env.VITE_API_URL}/api/orders`, 
+        orderData, 
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
     } catch (err) { 
-      alert("Failed to place order.");
+      // 🚀 NEW: Check if the error is a 403 (Forbidden / Expired Token)
+      if (err.response && err.response.status === 403) {
+        alert("Your session has expired. Please log in again to complete your order.");
+        logout(); // Automatically logs them out and redirects to home
+      } else {
+        alert("Failed to place order. Please try again.");
+      }
       throw err; 
     }
   };

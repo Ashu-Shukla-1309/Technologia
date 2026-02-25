@@ -7,8 +7,6 @@ import { toast } from 'react-hot-toast';
 const Orders = () => {
   const [orders, setOrders] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  
-  // 🚀 NEW: Search state
   const [searchTerm, setSearchTerm] = useState('');
 
   // Return Modal State
@@ -24,6 +22,10 @@ const Orders = () => {
   const userEmail = localStorage.getItem('userEmail');
   const isAdmin = localStorage.getItem('isAdmin') === 'true';
 
+  // 🛡️ SECURITY: Get token and set auth headers for all API calls
+  const token = localStorage.getItem('token');
+  const authHeaders = { headers: { Authorization: `Bearer ${token}` } };
+
   useEffect(() => {
     fetchOrders();
   }, []);
@@ -31,11 +33,8 @@ const Orders = () => {
   const fetchOrders = async () => {
     setIsLoading(true);
     try {
-      const url = isAdmin 
-        ? `${import.meta.env.VITE_API_URL}/api/orders` 
-        : `${import.meta.env.VITE_API_URL}/api/orders?email=${userEmail}`;
-        
-      const res = await axios.get(url);
+      // 🛡️ Backend securely handles Admin vs User logic via the token now. No need to pass email in URL.
+      const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/orders`, authHeaders);
       setOrders(res.data);
     } catch (err) {
       toast.error("Failed to load orders");
@@ -48,9 +47,8 @@ const Orders = () => {
     const loadingToast = toast.loading("Updating status...");
     try {
       await axios.put(`${import.meta.env.VITE_API_URL}/api/orders/${orderId}/status`, { 
-        status: newStatus, 
-        adminEmail: userEmail 
-      });
+        status: newStatus 
+      }, authHeaders);
       toast.success("Order status updated!", { id: loadingToast });
       fetchOrders(); 
     } catch (err) {
@@ -67,18 +65,16 @@ const Orders = () => {
   const handleReturnSubmit = async (e) => {
     e.preventDefault();
     if (!returnForm.reason.trim()) return toast.error("Please provide a reason.");
-
     const loadingToast = toast.loading("Sending request to admin...");
     try {
       await axios.post(`${import.meta.env.VITE_API_URL}/api/orders/${returnOrderDetails._id}/return`, {
         type: returnForm.type,
-        reason: returnForm.reason,
-        userEmail: userEmail
-      });
+        reason: returnForm.reason
+      }, authHeaders);
       
       toast.success("Request sent! Our team will contact you shortly.", { id: loadingToast });
       setIsReturnModalOpen(false);
-      fetchOrders(); 
+      fetchOrders();
     } catch (err) {
       toast.error("Failed to submit request", { id: loadingToast });
     }
@@ -93,12 +89,11 @@ const Orders = () => {
   const handleCancelSubmit = async (e) => {
     e.preventDefault();
     if (!cancelReason.trim()) return toast.error("Please provide a reason for cancellation.");
-
     const loadingToast = toast.loading("Cancelling order...");
     try {
       await axios.post(`${import.meta.env.VITE_API_URL}/api/orders/${cancelOrderDetails._id}/cancel`, {
         reason: cancelReason
-      });
+      }, authHeaders);
       
       toast.success("Order cancelled successfully.", { id: loadingToast });
       setIsCancelModalOpen(false);
@@ -117,7 +112,6 @@ const Orders = () => {
 
   const statusOptions = ["Processing", "Shipped", "Delivered", "Cancelled", "Refunded", "Replaced"];
 
-  // 🚀 NEW: Filter orders based on search term (ID or Item Name)
   const filteredOrders = orders.filter(order => {
     const term = searchTerm.toLowerCase();
     const matchId = order._id.toLowerCase().includes(term);
@@ -140,7 +134,7 @@ const Orders = () => {
             </p>
           </div>
           
-          {/* 🚀 NEW: Order Search Bar */}
+          {/* Order Search Bar */}
           {!isLoading && orders.length > 0 && (
             <div className="relative w-full md:w-80">
               <svg className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

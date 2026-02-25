@@ -6,8 +6,14 @@ const Profile = ({ logout }) => {
   const email = localStorage.getItem('userEmail');
 
   useEffect(() => {
-    axios.get(`${import.meta.env.VITE_API_URL}/api/orders?email=${email}`)
-      .then(res => setOrders(res.data));
+    // 🛡️ Get Token and Fetch Securely 
+    const token = localStorage.getItem('token');
+    
+    axios.get(`${import.meta.env.VITE_API_URL}/api/orders`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    .then(res => setOrders(res.data))
+    .catch(err => console.error("Failed to load profile data", err));
   }, [email]);
 
   return (
@@ -18,7 +24,9 @@ const Profile = ({ logout }) => {
             <h1 className="text-5xl font-black uppercase">Your Hub</h1>
             <p className="text-blue-600 font-mono mt-2 font-bold">{email}</p>
           </div>
-          <button onClick={logout} className="border border-red-500 text-red-600 px-6 py-2 rounded-xl hover:bg-red-50 hover:text-red-700 font-bold transition">Logout</button>
+          <button onClick={logout} className="border border-red-500 text-red-600 px-6 py-2 rounded-xl hover:bg-red-50 hover:text-red-700 font-bold transition">
+            Logout
+          </button>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">

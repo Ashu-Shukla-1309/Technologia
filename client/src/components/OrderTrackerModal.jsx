@@ -6,7 +6,7 @@ import CancelAnim from './CancelAnim';
 const OrderTrackerModal = ({ isOpen, onClose, order, onCancelOrder, isAdmin, userEmail }) => {
   const [view, setView] = useState('tracking');
   const [isLoading, setIsLoading] = useState(false);
-  
+
   useEffect(() => {
     if (isOpen) {
       setView('tracking');
@@ -32,10 +32,14 @@ const OrderTrackerModal = ({ isOpen, onClose, order, onCancelOrder, isAdmin, use
     const newStatus = e.target.value;
     setIsLoading(true);
     try {
+      // 🛡️ SECURITY FIX: Attach admin's token
+      const token = localStorage.getItem('token');
       await axios.put(`${import.meta.env.VITE_API_URL}/api/orders/${order._id}/status`, {
-        status: newStatus,
-        adminEmail: userEmail
+        status: newStatus
+      }, { 
+        headers: { Authorization: `Bearer ${token}` } 
       });
+      
       onClose(); 
     } catch (err) {
       alert("Failed to update status");
@@ -98,6 +102,7 @@ const OrderTrackerModal = ({ isOpen, onClose, order, onCancelOrder, isAdmin, use
                         </div>
                       )}
                     </div>
+                    
                     <div className="flex-1 pl-4">
                       <p className="text-gray-500 text-xs uppercase font-bold">Total Amount</p>
                       <p className="text-2xl font-black text-gray-900">₹{order.total}</p>

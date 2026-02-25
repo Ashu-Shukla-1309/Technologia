@@ -35,20 +35,20 @@ const ProductDetails = ({ addToCart }) => {
 
   const handleReviewSubmit = async (e) => {
     e.preventDefault();
-    const userEmail = localStorage.getItem('userEmail');
-    if (!userEmail) return toast.error("Please login to review!");
+    const token = localStorage.getItem('token');
+    const userName = localStorage.getItem('userEmail')?.split('@')[0] || "User";
+    
+    if (!token) return toast.error("Please login to review!");
 
     setIsSubmitting(true);
     try {
-      await axios.post(`${import.meta.env.VITE_API_URL}/api/products/${id}/reviews`, {
-        rating: newRating,
-        comment: newComment,
-        userEmail,
-        userName: userEmail.split('@')[0] // Simple name generation
-      });
+      await axios.post(`${import.meta.env.VITE_API_URL}/api/products/${id}/reviews`, 
+        { rating: newRating, comment: newComment, userName },
+        { headers: { Authorization: `Bearer ${token}` } } // 🛡️ Secure Header added
+      );
       toast.success("Review added! Thanks for your feedback.");
       setNewComment("");
-      fetchProduct(); // Refresh data
+      fetchProduct(); 
     } catch (err) {
       toast.error(err.response?.data?.error || "Review submission failed");
     } finally {

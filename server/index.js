@@ -49,9 +49,46 @@ const authLimiter = rateLimit({
   message: { error: "Security alert: Too many attempts. Please try again later." }
 });
 
+// ==========================================
+// 🛡️ SECURITY MIDDLEWARE (NEW)
+// ==========================================
+const authenticateToken = (req, res, next) => {
+  const authHeader = req.header('Authorization');
+  const token = authHeader && authHeader.split(' ')[1]; // Format: "Bearer TOKEN"
+
+  if (!token) return res.status(401).json({ error: "Access Denied. Please log in." });
+
+  try {
+    const verified = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = verified; // Contains { id, email, isAdmin }
+    next();
+  } catch (err) {
+    res.status(403).json({ error: "Invalid or expired token." });
+  }
+};
+
+const verifyAdmin = (req, res, next) => {
+  if (!req.user || !req.user.isAdmin) {
+    return res.status(403).json({ error: "Unauthorized. Admin privileges required." });
+  }
+  next();
+};
+
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log("Shielded DB Connected Successfully"))
   .catch(err => console.error("Database Connection Error:", err));
+
+// ==========================================
+// 🗄️ DATABASE SCHEMAS
+// ==========================================
+
+const reviewSchema = new mongoose.Schema({
+  userName: String,
+  userEmail: String,
+  rating: { type: Number, required: true },
+  comment: { type: String, required: true },
+  date: { type: Date, default: Date.now }
+});
 
 const Product = mongoose.model('Product', new mongoose.Schema({
   name: String, 
@@ -59,10 +96,12 @@ const Product = mongoose.model('Product', new mongoose.Schema({
   image: String, 
   category: String,
   description: String,
-  inStock: { type: Boolean, default: true }
+  inStock: { type: Boolean, default: true },
+  reviews: [reviewSchema], 
+  rating: { type: Number, default: 0 }, 
+  numReviews: { type: Number, default: 0 }
 }));
 
-// 🚀 UPDATED SCHEMA: Added cancelReason and cancelDate
 const Order = mongoose.model('Order', new mongoose.Schema({
   email: String, 
   customerName: String, 
@@ -119,6 +158,10 @@ const sendEmail = async (mailOptions, logTitle) => {
 };
 
 app.use('/api/auth/', authLimiter);
+
+// ==========================================
+// 🔐 AUTHENTICATION ROUTES
+// ==========================================
 
 app.post('/api/auth/register', async (req, res) => {
   try {
@@ -234,23 +277,28 @@ app.post('/api/auth/login', async (req, res) => {
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(400).json({ error: "Invalid credentials" });
     
-    const token = jwt.sign({ id: user._id, isAdmin }, process.env.JWT_SECRET, { expiresIn: '2h' });
+    // 🛡️ SECURITY FIX: Added 'email' to the JWT Payload so backend knows exactly who is making requests
+    const token = jwt.sign({ id: user._id, email: user.email, isAdmin }, process.env.JWT_SECRET, { expiresIn: '2h' });
     res.json({ token, email: user.email, isAdmin });
   } catch (err) {
     res.status(500).json({ error: "Login failed" });
   }
 });
 
+
+// ==========================================
+// 📦 PRODUCT ROUTES
+// ==========================================
+
 app.get('/api/products', async (req, res) => {
   try {
-    const products = await Product.find();
+    const products = await Product.find().sort({ _id: -1 });
     res.json(products);
   } catch (err) {
     res.status(500).json({ error: "Failed to fetch products" });
   }
 });
 
-// Route to fetch a single product by ID
 app.get('/api/products/:id', async (req, res) => {
   try {
     const product = await Product.findById(req.params.id);
@@ -261,13 +309,18 @@ app.get('/api/products/:id', async (req, res) => {
   }
 });
 
-app.post('/api/products', async (req, res) => {
-    const newProduct = new Product(req.body);
-    await newProduct.save();
-    res.json(newProduct);
+// 🛡️ SECURITY FIX: Only Admins can add/edit/delete
+app.post('/api/products', authenticateToken, verifyAdmin, async (req, res) => {
+    try {
+        const newProduct = new Product(req.body);
+        await newProduct.save();
+        res.json(newProduct);
+    } catch (err) {
+        res.status(500).json({ error: "Failed to add product" });
+    }
 });
 
-app.put('/api/products/:id', async (req, res) => {
+app.put('/api/products/:id', authenticateToken, verifyAdmin, async (req, res) => {
   try {
     const updatedProduct = await Product.findByIdAndUpdate(
       req.params.id, 
@@ -280,7 +333,7 @@ app.put('/api/products/:id', async (req, res) => {
   }
 });
 
-app.delete('/api/products/:id', async (req, res) => {
+app.delete('/api/products/:id', authenticateToken, verifyAdmin, async (req, res) => {
     try {
         await Product.findByIdAndDelete(req.params.id);
         res.json({ message: "Product successfully removed" });
@@ -289,19 +342,79 @@ app.delete('/api/products/:id', async (req, res) => {
     }
 });
 
-app.post('/api/orders', async (req, res) => {
+// ==========================================
+// ⭐ REVIEWS ROUTE (NEW)
+// ==========================================
+app.post('/api/products/:id/reviews', authenticateToken, async (req, res) => {
   try {
-    const { email, customerName, phone, address, items, total, paymentMethod, transactionId } = req.body;
-    const newOrder = new Order({ email, customerName, phone, address, items, total, paymentMethod, transactionId });
+    const { rating, comment, userName } = req.body;
+    const userEmail = req.user.email; // Extracted securely from JWT
+
+    const hasBought = await Order.findOne({ email: userEmail, status: "Delivered", "items.productId": req.params.id });
+    if (!hasBought && !req.user.isAdmin) return res.status(403).json({ error: "You can only review delivered items." });
+
+    const product = await Product.findById(req.params.id);
+    if (!product) return res.status(404).json({ error: "Product not found" });
+
+    if (product.reviews.find(r => r.userEmail === userEmail)) return res.status(400).json({ error: "Already reviewed." });
+
+    product.reviews.push({ userName, userEmail, rating: Number(rating), comment });
+    product.numReviews = product.reviews.length;
+    product.rating = product.reviews.reduce((acc, item) => item.rating + acc, 0) / product.reviews.length;
+    
+    await product.save(); 
+    res.status(201).json({ message: "Review added" });
+  } catch (err) { res.status(500).json({ error: "Review failed" }); }
+});
+
+
+// ==========================================
+// 🛒 ORDER ROUTES
+// ==========================================
+
+// 🛡️ SECURITY FIX: Recalculates total price on server to prevent price hacking
+app.post('/api/orders', authenticateToken, async (req, res) => {
+  try {
+    const { customerName, phone, address, items, paymentMethod, transactionId } = req.body;
+    
+    let secureTotal = 0;
+    const secureItems = [];
+
+    // Verify prices from the database
+    for (let item of items) {
+      const product = await Product.findById(item._id);
+      if (product) {
+        const qty = item.quantity || 1;
+        secureTotal += product.price * qty;
+        secureItems.push({ 
+          productId: product._id, 
+          name: product.name, 
+          price: product.price, 
+          quantity: qty, 
+          image: product.image 
+        });
+      }
+    }
+
+    const newOrder = new Order({ 
+      email: req.user.email, // 🛡️ Pulled from token, not body
+      customerName, 
+      phone, 
+      address, 
+      items: secureItems, 
+      total: secureTotal, 
+      paymentMethod, 
+      transactionId 
+    });
     await newOrder.save();
 
-    const formattedTotal = total.toLocaleString('en-IN');
+    const formattedTotal = secureTotal.toLocaleString('en-IN');
     
-    const itemsListHtml = items.map(item => 
+    const itemsListHtml = secureItems.map(item => 
       `<tr>
         <td style="padding: 8px; border-bottom: 1px solid #ddd;">${item.name}</td>
-        <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: center;">x${item.quantity || 1}</td>
-        <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">₹${item.price}</td>
+        <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: center;">x${item.quantity}</td>
+        <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">₹${item.price.toLocaleString('en-IN')}</td>
       </tr>`
     ).join('');
 
@@ -319,7 +432,7 @@ app.post('/api/orders', async (req, res) => {
             <h3 style="color: #1e293b; border-bottom: 2px solid #f1f5f9; padding-bottom: 10px;">Customer Details</h3>
             <p style="color: #475569; line-height: 1.6;">
               <strong>Name:</strong> ${customerName}<br>
-              <strong>Email:</strong> ${email}<br>
+              <strong>Email:</strong> ${req.user.email}<br>
               <strong>Phone:</strong> ${phone}<br>
               <strong>Delivery Address:</strong> ${address}
             </p>
@@ -359,20 +472,21 @@ app.post('/api/orders', async (req, res) => {
   }
 });
 
-app.get('/api/orders', async (req, res) => {
-  const { email } = req.query;
-  const filter = email ? { email: email.toLowerCase() } : {};
-  res.json(await Order.find(filter).sort({ date: -1 }));
+// 🛡️ SECURITY FIX: Removed unauthenticated data leak. Users only see their own orders now.
+app.get('/api/orders', authenticateToken, async (req, res) => {
+  try {
+    const filter = req.user.isAdmin ? {} : { email: req.user.email };
+    res.json(await Order.find(filter).sort({ date: -1 }));
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch orders" });
+  }
 });
 
-app.put('/api/orders/:id/status', async (req, res) => {
+// 🛡️ SECURITY FIX: Prevents fake admin status updates
+app.put('/api/orders/:id/status', authenticateToken, verifyAdmin, async (req, res) => {
   try {
-    const { status, adminEmail } = req.body;
+    const { status } = req.body;
     
-    if (adminEmail !== process.env.ADMIN_EMAIL) {
-      return res.status(403).json({ error: "Unauthorized. Admin access required." });
-    }
-
     const updatedOrder = await Order.findByIdAndUpdate(
       req.params.id, 
       { status }, 
@@ -384,12 +498,14 @@ app.put('/api/orders/:id/status', async (req, res) => {
   }
 });
 
-app.post('/api/orders/:id/return', async (req, res) => {
+// 🛡️ SECURITY FIX: Ensures users can only return their own items
+app.post('/api/orders/:id/return', authenticateToken, async (req, res) => {
   try {
-    const { type, reason, userEmail } = req.body;
+    const { type, reason } = req.body;
     const order = await Order.findById(req.params.id);
     
     if (!order) return res.status(404).json({ error: "Order not found" });
+    if (order.email !== req.user.email && !req.user.isAdmin) return res.status(403).json({ error: "Unauthorized" });
 
     order.status = `Return Requested (${type})`;
     await order.save();
@@ -407,7 +523,7 @@ app.post('/api/orders/:id/return', async (req, res) => {
           </div>
           <div style="padding: 30px; background-color: #ffffff;">
             <p style="color: #475569; line-height: 1.6;">
-              <strong>Customer Email:</strong> ${userEmail}<br>
+              <strong>Customer Email:</strong> ${req.user.email}<br>
               <strong>Order ID:</strong> ${order._id}<br>
               <strong>Request Type:</strong> <span style="color: #d97706; font-weight: bold;">${type}</span><br>
               <strong>Total Value:</strong> ₹${formattedTotal}
@@ -430,16 +546,16 @@ app.post('/api/orders/:id/return', async (req, res) => {
   }
 });
 
-// 🚀 NEW/UPDATED: Cancel Order Endpoint (Replaces the old DELETE route)
-app.post('/api/orders/:id/cancel', async (req, res) => {
+// 🛡️ SECURITY FIX: Ensures users can only cancel their own items
+app.post('/api/orders/:id/cancel', authenticateToken, async (req, res) => {
     try {
         const { reason } = req.body;
         const order = await Order.findById(req.params.id);
         
         if (!order) return res.status(404).json({ error: "Order record not found" });
         if (order.status === "Cancelled") return res.status(400).json({ error: "Order is already cancelled" });
+        if (order.email !== req.user.email && !req.user.isAdmin) return res.status(403).json({ error: "Unauthorized" });
 
-        // Update instead of delete
         order.status = "Cancelled";
         order.cancelReason = reason;
         order.cancelDate = new Date();
@@ -448,7 +564,6 @@ app.post('/api/orders/:id/cancel', async (req, res) => {
         const formattedTotal = order.total.toLocaleString('en-IN');
         const formattedDate = order.cancelDate.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
         
-        // Detailed Email sent to your Admin Gmail
         const mailOptions = {
           to: process.env.ADMIN_EMAIL,
           subject: `Alert: Order Cancelled by User | ₹${formattedTotal}`,
