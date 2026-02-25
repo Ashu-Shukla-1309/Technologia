@@ -250,6 +250,17 @@ app.get('/api/products', async (req, res) => {
   }
 });
 
+// Route to fetch a single product by ID
+app.get('/api/products/:id', async (req, res) => {
+  try {
+    const product = await Product.findById(req.params.id);
+    if (!product) return res.status(404).json({ error: "Product not found" });
+    res.json(product);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch product details" });
+  }
+});
+
 app.post('/api/products', async (req, res) => {
     const newProduct = new Product(req.body);
     await newProduct.save();

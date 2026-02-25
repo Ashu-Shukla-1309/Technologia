@@ -14,6 +14,7 @@ import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import Profile from './pages/Profile';
 import Wishlist from './pages/Wishlist';
+import ProductDetails from './components/ProductDetails';
 
 function App() {
   const [products, setProducts] = useState([]);
@@ -120,6 +121,7 @@ function App() {
           <Route path="/wishlist" element={<Wishlist products={products} addToCart={addToCart} />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/profile" element={token ? <Profile logout={logout} /> : <Navigate to="/login" />} />
+          <Route path="/product/:id" element={<ProductDetails addToCart={addToCart} />} />
           <Route path="/add" element={isAdmin ? <AddProduct fetchProducts={fetchProducts} /> : <Navigate to="/" />} />
         </Routes>
 

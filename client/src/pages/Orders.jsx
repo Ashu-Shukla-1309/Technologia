@@ -8,12 +8,15 @@ const Orders = () => {
   const [orders, setOrders] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   
+  // 🚀 NEW: Search state
+  const [searchTerm, setSearchTerm] = useState('');
+
   // Return Modal State
   const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
   const [returnOrderDetails, setReturnOrderDetails] = useState(null);
   const [returnForm, setReturnForm] = useState({ type: 'Refund', reason: '' });
 
-  // 🚀 NEW: Cancel Modal State
+  // Cancel Modal State
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [cancelOrderDetails, setCancelOrderDetails] = useState(null);
   const [cancelReason, setCancelReason] = useState('');
@@ -81,14 +84,12 @@ const Orders = () => {
     }
   };
 
-  // 🚀 NEW: Open Cancel Modal
   const openCancelModal = (order) => {
     setCancelOrderDetails(order);
     setCancelReason('');
     setIsCancelModalOpen(true);
   };
 
-  // 🚀 NEW: Submit Cancel Request
   const handleCancelSubmit = async (e) => {
     e.preventDefault();
     if (!cancelReason.trim()) return toast.error("Please provide a reason for cancellation.");
@@ -101,7 +102,7 @@ const Orders = () => {
       
       toast.success("Order cancelled successfully.", { id: loadingToast });
       setIsCancelModalOpen(false);
-      fetchOrders(); // Refresh to update status on screen
+      fetchOrders(); 
     } catch (err) {
       toast.error(err.response?.data?.error || "Failed to cancel order", { id: loadingToast });
     }
@@ -116,10 +117,20 @@ const Orders = () => {
 
   const statusOptions = ["Processing", "Shipped", "Delivered", "Cancelled", "Refunded", "Replaced"];
 
+  // 🚀 NEW: Filter orders based on search term (ID or Item Name)
+  const filteredOrders = orders.filter(order => {
+    const term = searchTerm.toLowerCase();
+    const matchId = order._id.toLowerCase().includes(term);
+    const matchItem = order.items.some(item => item.name.toLowerCase().includes(term));
+    return matchId || matchItem;
+  });
+
   return (
     <div className="min-h-screen bg-slate-50 py-24 px-6 font-sans">
       <div className="container mx-auto max-w-5xl">
-        <div className="flex flex-col md:flex-row justify-between items-end mb-12 border-b border-slate-200 pb-6 gap-4">
+        
+        {/* Header & Search Bar Section */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-12 border-b border-slate-200 pb-6 gap-4">
           <div>
             <h1 className="text-4xl font-black text-gray-900 tracking-tight">
               {isAdmin ? "Global Order Management" : "My Orders"}
@@ -128,6 +139,22 @@ const Orders = () => {
               {isAdmin ? "Track, update, and manage all customer purchases." : "View and manage your recent purchases."}
             </p>
           </div>
+          
+          {/* 🚀 NEW: Order Search Bar */}
+          {!isLoading && orders.length > 0 && (
+            <div className="relative w-full md:w-80">
+              <svg className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <input 
+                type="text" 
+                placeholder="Search by Order ID or Item..." 
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-12 pr-4 py-3 bg-white border border-gray-200 rounded-full focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all shadow-sm font-medium text-gray-700"
+              />
+            </div>
+          )}
         </div>
 
         {isLoading ? (
@@ -145,10 +172,14 @@ const Orders = () => {
               </Link>
             )}
           </div>
+        ) : filteredOrders.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-gray-500 font-bold text-lg">No orders found matching "{searchTerm}"</p>
+          </div>
         ) : (
           <div className="space-y-6">
             <AnimatePresence>
-              {orders.map((order) => (
+              {filteredOrders.map((order) => (
                 <motion.div key={order._id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-white p-6 md:p-8 rounded-[2rem] shadow-sm border border-gray-100 flex flex-col gap-6">
                   
                   {/* Order Header */}
@@ -197,7 +228,7 @@ const Orders = () => {
                     ))}
                   </div>
 
-                  {/* 🚀 NEW: Admin Dashboard Context (Shows why it was cancelled) */}
+                  {/* Admin Dashboard Context (Shows why it was cancelled) */}
                   {(isAdmin || order.status === "Cancelled") && order.cancelReason && (
                      <div className="bg-red-50 text-red-800 p-4 rounded-xl text-sm font-bold border border-red-200 mt-2">
                        <p className="mb-1">⚠️ Cancellation Reason: <span className="font-normal">{order.cancelReason}</span></p>
@@ -209,7 +240,6 @@ const Orders = () => {
                   {!isAdmin && (
                     <div className="pt-4 border-t border-gray-100 flex justify-end gap-3">
                       
-                      {/* Show Cancel Button ONLY if it's currently Processing */}
                       {order.status === "Processing" && (
                         <button 
                           onClick={() => openCancelModal(order)}
@@ -219,7 +249,6 @@ const Orders = () => {
                         </button>
                       )}
 
-                      {/* Return/Replace for Delivered Items */}
                       {order.status === "Delivered" && (
                         <button 
                           onClick={() => openReturnModal(order)}
@@ -290,7 +319,7 @@ const Orders = () => {
         )}
       </AnimatePresence>
 
-      {/* 🚀 NEW: CANCEL ORDER MODAL */}
+      {/* CANCEL ORDER MODAL */}
       <AnimatePresence>
         {isCancelModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">

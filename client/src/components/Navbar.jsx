@@ -1,25 +1,48 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { Link, useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import CheckoutModal from './CheckoutModal';
 
 const Navbar = ({ cart, removeFromCart, updateQuantity, isOpen, setIsOpen, clearCart, searchTerm, setSearchTerm, token, isAdmin, logout }) => {
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
   
+  // 🚀 NEW: Search State
+  const [allProducts, setAllProducts] = useState([]);
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearchDropdownOpen, setIsSearchDropdownOpen] = useState(false);
+  
   const navigate = useNavigate();
   const dropdownRef = useRef(null); 
+  const searchRef = useRef(null); // 🚀 NEW: Ref for search bar
   
   const total = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
   
   const userEmail = localStorage.getItem('userEmail') || "User";
 
-  // 🚀 Event listener to close dropdown when clicking anywhere else on the screen
+  // Fetch all products once for instant local search filtering
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/products`);
+        setAllProducts(res.data);
+      } catch (err) {
+        console.error("Failed to load products for search", err);
+      }
+    };
+    fetchProducts();
+  }, []);
+
+  // Event listener to close dropdowns when clicking anywhere else on the screen
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setIsProfileDropdownOpen(false);
+      }
+      if (searchRef.current && !searchRef.current.contains(event.target)) {
+        setIsSearchDropdownOpen(false);
       }
     };
 
@@ -28,6 +51,32 @@ const Navbar = ({ cart, removeFromCart, updateQuantity, isOpen, setIsOpen, clear
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
+
+  // 🚀 NEW: Handle Search Input
+  const handleSearchChange = (e) => {
+    const value = e.target.value;
+    setSearchTerm(value); // Keep your existing page filter working
+
+    if (value.trim().length > 0) {
+      const filtered = allProducts.filter(product => 
+        product.name.toLowerCase().includes(value.toLowerCase()) || 
+        product.category?.toLowerCase().includes(value.toLowerCase())
+      ).slice(0, 5); // Limit to top 5 results
+      
+      setSearchResults(filtered);
+      setIsSearchDropdownOpen(true);
+    } else {
+      setSearchResults([]);
+      setIsSearchDropdownOpen(false);
+    }
+  };
+
+  // 🚀 NEW: Handle Clicking a Search Result
+  const handleSelectProduct = (productId) => {
+    setIsSearchDropdownOpen(false);
+    setSearchTerm(''); // Clear the search bar
+    navigate(`/product/${productId}`); // Adjust this path if your product details page has a different route
+  };
 
   const handleCheckoutSubmit = async (orderData) => {
     try {
@@ -63,14 +112,61 @@ const Navbar = ({ cart, removeFromCart, updateQuantity, isOpen, setIsOpen, clear
             TECHNOLOGIA
           </Link>
           
-          <div className="relative w-full md:w-1/3">
-            <input 
-              type="text"
-              placeholder="Search gadgets..."
-              className="w-full px-4 py-2 rounded-full bg-gray-100 text-gray-900 placeholder-gray-500 border border-gray-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+          {/* --- SEARCH BAR SECTION --- */}
+          <div className="relative w-full md:w-1/3" ref={searchRef}>
+            <div className="relative">
+              <svg className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <input 
+                type="text"
+                placeholder="Search gadgets, categories..."
+                className="w-full pl-12 pr-4 py-2.5 rounded-full bg-gray-100 text-gray-900 placeholder-gray-500 border border-transparent focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all font-medium"
+                value={searchTerm}
+                onChange={handleSearchChange}
+                onFocus={() => searchTerm.trim().length > 0 && setIsSearchDropdownOpen(true)}
+              />
+            </div>
+
+            {/* LIVE DROPDOWN RESULTS */}
+            <AnimatePresence>
+              {isSearchDropdownOpen && searchResults.length > 0 && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 10 }}
+                  className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden z-50"
+                >
+                  <ul className="py-2">
+                    {searchResults.map((product) => (
+                      <li 
+                        key={product._id} 
+                        onClick={() => handleSelectProduct(product._id)}
+                        className="px-4 py-3 hover:bg-blue-50 cursor-pointer flex items-center gap-4 transition-colors border-b border-gray-50 last:border-0"
+                      >
+                        <img src={product.image} alt={product.name} className="w-10 h-10 object-contain mix-blend-multiply rounded-lg bg-gray-50 p-1" />
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-gray-900 truncate text-sm">{product.name}</p>
+                          <p className="text-blue-600 font-bold text-xs mt-0.5">₹{product.price.toLocaleString('en-IN')}</p>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </motion.div>
+              )}
+
+              {/* NO RESULTS STATE */}
+              {isSearchDropdownOpen && searchTerm.trim().length > 0 && searchResults.length === 0 && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 10 }}
+                  className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-xl border border-gray-100 p-6 text-center z-50"
+                >
+                  <p className="text-gray-500 font-medium text-sm">No products found matching "{searchTerm}"</p>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
           <div className="flex items-center gap-4 md:gap-6">
