@@ -178,17 +178,18 @@ const Navbar = ({ cart, removeFromCart, updateQuantity, isOpen, setIsOpen, clear
                   onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
                   className="flex items-center gap-2 hover:bg-gray-50 pr-4 pl-2 py-1 rounded-full transition-all border border-transparent hover:border-gray-200"
                 >
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 flex items-center justify-center text-sm font-bold shadow-md text-white">
+                  <div className="w-10 h-10 rounded-full bg-emerald-500
+                  flex items-center justify-center text-sm font-bold shadow-md text-white">
                     {userEmail.charAt(0).toUpperCase()}
                   </div>
                   <div className="text-left hidden md:block">
                     <p className="text-xs text-gray-500">Signed in as</p>
-                    <p className="text-xs font-bold text-gray-900 max-w-[100px] truncate">{userEmail}</p>
+                    <p className="text-xs font-bold text-gray-900 max-w-[150px] truncate">{userEmail}</p>
                   </div>
                 </button>
 
                 {isProfileDropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-xl shadow-xl py-2 z-50">
+                  <div className="absolute right-0 mt-2 w-80 bg-white border border-gray-200 rounded-xl shadow-xl py-2 z-50">
                      <div className="px-4 py-3 border-b border-gray-100 mb-2">
                         <p className="text-xs text-gray-500">Account</p>
                         <p className="text-sm font-bold text-gray-900 truncate">{userEmail}</p>

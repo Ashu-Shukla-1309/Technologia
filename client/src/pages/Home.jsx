@@ -8,7 +8,7 @@ const Home = ({ products = [], isLoading, addToCart, searchTerm }) => {
   const [unitCounts, setUnitCounts] = useState({});
   const [expandedId, setExpandedId] = useState(null); 
   
-  // 🚀 NEW FEATURES STATE
+  
   const [sortOrder, setSortOrder] = useState("default");
   const [wishlist, setWishlist] = useState(() => {
     const saved = localStorage.getItem('technologia_wishlist');
@@ -18,11 +18,11 @@ const Home = ({ products = [], isLoading, addToCart, searchTerm }) => {
   const words = ["Laptops", "Drones", "VR Gear", "Consoles", "Smart Home"];
 
   const bannerImages = [
-    "https://pngimg.com/uploads/macbook/macbook_PNG65.png",                               
+    "https://pngimg.com/uploads/macbook/macbook_PNG65.png",                                
     "https://pngimg.com/uploads/drone/drone_PNG204.png",                                  
     "https://file.aiquickdraw.com/imgcompressed/img/compressed_5733db2c0bdb304c4f8c5863b04e3c4c.webp",
-    "https://pngimg.com/uploads/gamepad/gamepad_PNG62.png",                               
-    "https://m.media-amazon.com/images/I/61fB9i7y81L.png"               
+    "https://pngimg.com/uploads/gamepad/gamepad_PNG62.png",                                
+    "https://m.media-amazon.com/images/I/61fB9i7y81L.png"                
   ];
 
 
@@ -79,37 +79,40 @@ const Home = ({ products = [], isLoading, addToCart, searchTerm }) => {
   return (
     <div className="bg-slate-50 min-h-screen text-gray-900 font-sans overflow-x-hidden">
       
-      {/* 🚀 HERO SECTION (Unchanged for brevity, keep your exact Hero section code here) */}
-      <section className="relative h-screen flex items-center justify-center overflow-hidden bg-gradient-to-br from-blue-900 via-indigo-900 to-blue-950">
+      {/* 🚀 COMPACT HERO SECTION */}
+      <section className="relative h-[500px] md:h-[700px] flex items-center justify-center overflow-hidden bg-gradient-to-br from-blue-900 via-indigo-900 to-blue-950">
         <div className="absolute inset-0 z-0 overflow-hidden">
-          <motion.div animate={{ scale: [1, 1.2, 1], x: [0, 80, 0], y: [0, -40, 0] }} transition={{ duration: 15, repeat: Infinity, ease: "easeInOut" }} className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-blue-500/30 blur-[120px] rounded-full" />
-          <motion.div animate={{ scale: [1.2, 1, 1.2], x: [0, -80, 0], y: [0, 80, 0] }} transition={{ duration: 20, repeat: Infinity, ease: "easeInOut" }} className="absolute bottom-[-10%] right-[-10%] w-[600px] h-[600px] bg-cyan-400/20 blur-[120px] rounded-full" />
+          <motion.div animate={{ scale: [1, 1.2, 1], x: [0, 80, 0], y: [0, -40, 0] }} transition={{ duration: 15, repeat: Infinity, ease: "easeInOut" }} className="absolute top-[-10%] left-[-10%] w-[10000px] h-[1000px] bg-blue-500/30 blur-[100px] rounded-full" />
+          <motion.div animate={{ scale: [1.2, 1, 1.2], x: [0, -80, 0], y: [0, 80, 0] }} transition={{ duration: 20, repeat: Infinity, ease: "easeInOut" }} className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-cyan-400/20 blur-[100px] rounded-full" />
         </div>
-        <div className="absolute inset-0 z-0 opacity-20" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize: '40px 40px' }}></div>
-        <div className="container mx-auto px-6 z-20 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center h-full">
-          <div className="text-left pt-10">
+        <div className="absolute inset-0 z-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize: '40px 40px' }}></div>
+        
+        <div className="container mx-auto px-6 z-20 grid grid-cols-1 lg:grid-cols-2 gap-8 items-center h-full">
+          <div className="text-left">
             <motion.div initial={{ opacity: 0, x: -50 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.8 }}>
-              <h1 className="text-6xl md:text-8xl font-black tracking-tighter leading-none mb-4 text-white drop-shadow-lg">For you <br/> we have</h1>
-              <div className="h-[120px] flex items-center">
+              {/* Reduced font sizes for compact look */}
+              <h1 className="text-5xl md:text-7xl font-black tracking-tighter leading-tight mb-2 text-white drop-shadow-lg">For you <br/> we have</h1>
+              <div className="h-[80px] md:h-[100px] flex items-center">
                 <AnimatePresence mode="wait">
-                  <motion.span key={index} initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -20, opacity: 0 }} transition={{ duration: 0.4 }} className="block text-6xl md:text-8xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 to-blue-200 drop-shadow-md">
+                  <motion.span key={index} initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -20, opacity: 0 }} transition={{ duration: 0.4 }} className="block text-5xl md:text-7xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 to-blue-200 drop-shadow-md">
                     {words[index]}
                   </motion.span>
                 </AnimatePresence>
               </div>
-              <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }} className="mt-8 text-xl text-blue-100 max-w-lg leading-relaxed border-l-4 border-cyan-400 pl-6 bg-white/10 backdrop-blur-md p-4 rounded-r-2xl shadow-xl border-y border-r border-white/20">
-                Premium gadgets delivered to your doorstep. Fill your cart and experience the future.
+              <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }} className="mt-4 text-lg text-blue-100 max-w-md leading-relaxed border-l-4 border-cyan-400 pl-6 bg-white/10 backdrop-blur-md p-3 rounded-r-2xl shadow-xl border border-white/20">
+                Premium gadgets delivered to your doorstep.
               </motion.p>
-              <div className="mt-10">
-                <button onClick={scrollToShop} className="bg-white text-blue-900 px-10 py-4 rounded-full font-black text-xl hover:bg-cyan-50 hover:scale-105 transition-all shadow-xl hover:shadow-cyan-500/50">Shop Now</button>
+              <div className="mt-8">
+                <button onClick={scrollToShop} className="bg-white text-blue-900 px-8 py-3 rounded-full font-black text-lg hover:bg-cyan-50 hover:scale-105 transition-all shadow-xl">Shop Now</button>
               </div>
             </motion.div>
           </div>
-          <div className="hidden lg:flex justify-center items-center relative h-[600px] w-full">
-            <div className="absolute w-[450px] h-[450px] bg-blue-300/10 blur-[60px] rounded-full z-0" />
-            <motion.div className="relative z-20 w-full max-w-lg flex justify-center items-center h-[450px]">
+
+          <div className="hidden lg:flex justify-center items-center relative h-[400px] w-full">
+            <div className="absolute w-[350px] h-[350px] bg-blue-300/10 blur-[50px] rounded-full z-0" />
+            <motion.div className="relative z-20 w-full max-w-md flex justify-center items-center h-[350px]">
               <AnimatePresence mode="wait">
-                <motion.img key={index} src={bannerImages[index]} alt={words[index]} className="absolute w-[85%] h-[85%] object-contain drop-shadow-[0_20px_40px_rgba(0,0,0,0.6)]" initial={{ opacity: 0, x: 80, scale: 0.9, rotateY: 15 }} animate={{ opacity: 1, x: 0, scale: 1.25, rotateY: 0 }} exit={{ opacity: 0, x: -80, scale: 0.9, rotateY: -15 }} transition={{ duration: 0.7, ease: [0.25, 0.1, 0.25, 1] }}/>
+                <motion.img key={index} src={bannerImages[index]} alt={words[index]} className="absolute w-[100%] h-[100%] object-contain drop-shadow-[0_15px_30px_rgba(0,0,0,0.5)]" initial={{ opacity: 0, x: 80, scale: 0.9 }} animate={{ opacity: 1, x: 0, scale: 1.1 }} exit={{ opacity: 0, x: -80, scale: 0.9 }} transition={{ duration: 0.7, ease: [0.25, 0.1, 0.25, 1] }}/>
               </AnimatePresence>
             </motion.div>
           </div>
@@ -117,7 +120,7 @@ const Home = ({ products = [], isLoading, addToCart, searchTerm }) => {
       </section>
 
       {/* 🚀 2. THE DISTINCT WHITE CARDS SECTION */}
-      <div id="shop-section" className="relative z-30 bg-slate-100 py-24 border-t border-slate-200 shadow-[inset_0_10px_30px_rgba(0,0,0,0.02)]">
+      <div id="shop-section" className="relative z-30 bg-slate-100 py-20 border-t border-slate-200 shadow-[inset_0_10px_30px_rgba(0,0,0,0.02)]">
         <div className="container mx-auto px-6">
           
           <div className="flex flex-col md:flex-row justify-between items-end mb-8 pb-6 border-b border-slate-200">
@@ -126,7 +129,6 @@ const Home = ({ products = [], isLoading, addToCart, searchTerm }) => {
                <h2 className="text-5xl font-black text-gray-900">Latest Drops</h2>
             </div>
             
-            {/* 🚀 ADDED: SORTING DROPDOWN */}
             <div className="mt-6 md:mt-0">
               <select 
                 value={sortOrder} 
@@ -155,7 +157,6 @@ const Home = ({ products = [], isLoading, addToCart, searchTerm }) => {
             ))}
           </div>
 
-          {/* 🚀 ADDED: LOADING SKELETONS */}
           {isLoading ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
               {[...Array(8)].map((_, i) => (
@@ -168,7 +169,7 @@ const Home = ({ products = [], isLoading, addToCart, searchTerm }) => {
               ))}
             </div>
           ) : displayProducts.length === 0 ? (
-             <div className="text-center py-20 opacity-50"><h3 className="text-2xl font-bold">No products found.</h3></div>
+              <div className="text-center py-20 opacity-50"><h3 className="text-2xl font-bold">No products found.</h3></div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
               {displayProducts.map(product => {
@@ -185,7 +186,6 @@ const Home = ({ products = [], isLoading, addToCart, searchTerm }) => {
                   key={product._id}
                   className="bg-white p-5 rounded-[2rem] shadow-lg hover:shadow-2xl transition-all duration-300 flex flex-col border border-white/60 relative"
                  >
-                  {/* 🚀 ADDED: WISHLIST HEART ICON */}
                   <button 
                     onClick={() => toggleWishlist(product._id)}
                     className="absolute top-8 right-8 z-10 p-2 bg-white/80 backdrop-blur-md rounded-full shadow-sm hover:scale-110 transition-transform"
@@ -249,8 +249,8 @@ const Home = ({ products = [], isLoading, addToCart, searchTerm }) => {
                       </div>
                     </div>
                   </div>
-                </motion.div>
-              )})}
+                 </motion.div>
+                )})}
             </div>
           )}
         </div>
