@@ -33,8 +33,12 @@ We built this using the **MERN Stack** (MongoDB, Express, React, Node.js) and ma
 * **Smooth Animations:** The website feels alive! Buttons react when you hover over them, pages slide in smoothly, and pop-up messages appear beautifully, all thanks to a tool called **Framer Motion**.
 * **Track Your Order:** Once you buy something, you get a visual timeline showing exactly where your package is (like "Processing," "Shipped," "Delivered").
 * **Easy Checkout:** When you're ready to pay, a slick window pops up. You can choose to pay by Card, Cash on Delivery, or even scan a real, generated UPI QR Code with your phone!
-* **Secret Admin Area:** If you are the owner (Admin), you get a special hidden dashboard where you can add new gadgets, change prices, or delete items right from the website and also you will get all the updates Orders recieved/ Cancelled with all the info of the customer like Name, Contact details and address and you can update Order status of customer's order in the database (Mongodb Atlas).
+* **Secret Admin Area:** If you are the owner (Admin), you get a special hidden dashboard where you can add new gadgets, change prices, or delete items right from the website and also you will get all the updates Orders recieved/ Cancelled/ Returned etc. with all the info of the customer like Name, Contact details and address and you can update Order status of customer's order in the database (Mongodb Atlas) and in Admin dashboard too (Order history).
+* 🔍 **Google-Style Live Search & Filtering**: Find gadgets instantly with a real-time, animated dropdown search bar in the navigation. You can also filter the homepage by exact Categories and a dynamic Price Range slider, all powered by fast backend pagination.
 
+⭐ **Verified Reviews & Ratings**: E-commerce runs on social proof! Customers can leave 1-5 star ratings and written reviews on products, but only if their order status is marked as "Delivered" in the database to prevent fake reviews.
+
+🔄 **Self-Serve Cancellations & Returns**: Users can cancel "Processing" orders or request "Returns/Replacements" for delivered items directly from their dashboard. The system automatically sends a beautifully formatted alert with the customer's reason straight to the Admin's email.
 <a name="security"></a>
 
 ## 🛡️ How Is It Kept Safe? (Security)
