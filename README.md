@@ -11,20 +11,31 @@ Check out the deployed website:- [https://technologia-ibm.vercel.app/](https://t
 
 ## 📑 Table of Contents
 
-1. [What Can It Do? (Key Features)](https://www.google.com/search?q=%23-what-can-it-do-key-features)
-2. [How Is It Kept Safe? (Security)](https://www.google.com/search?q=%23%EF%B8%8F-how-is-it-kept-safe-security)
-3. [What is it Built With? (Tech Stack)](https://www.google.com/search?q=%23%EF%B8%8F-what-is-it-built-with-tech-stack)
-4. [How Does it Look? (Design)](https://www.google.com/search?q=%23-how-does-it-look-design)
-5. [Step-by-Step Setup Guide (For Beginners!)](https://www.google.com/search?q=%23-step-by-step-setup-guide-for-beginners)
-* [Step 1: Things You Need First (Prerequisites)](https://www.google.com/search?q=%23step-1-things-you-need-first-prerequisites)
-* [Step 2: Downloading the Code](https://www.google.com/search?q=%23step-2-downloading-the-code)
-* [Step 3: Setting Up the "Brain" (Backend)](https://www.google.com/search?q=%23step-3-setting-up-the-brain-backend)
-* [Step 4: Setting Up the "Face" (Frontend)](https://www.google.com/search?q=%23step-4-setting-up-the-face-frontend)
-* [Step 5: Turning It On!](https://www.google.com/search?q=%23step-5-turning-it-on)
 
 
-6. [Putting It on the Internet (Deployment)](https://www.google.com/search?q=%23%EF%B8%8F-putting-it-on-the-internet-deployment)
-7. [Meet the Creator](https://www.google.com/search?q=%23meet-the-creator)
+1. [What Can It Do? (Key Features)](#-what-can-it-do-key-features)
+
+2. [How Is It Kept Safe? (Security)](#️-how-is-it-kept-safe-security)
+
+3. [What is it Built With? (Tech Stack)](#️-what-is-it-built-with-tech-stack)
+
+4. [How Does it Look? (Design)](#-how-does-it-look-design)
+
+5. [Step-by-Step Setup Guide (For Beginners!)](#-step-by-step-setup-guide-for-beginners)
+
+   * [Step 1: Things You Need First (Prerequisites)](#step-1-things-you-need-first-prerequisites)
+
+   * [Step 2: Downloading the Code](#step-2-downloading-the-code)
+
+   * [Step 3: Setting Up the "Brain" (Backend)](#step-3-setting-up-the-brain-backend)
+
+   * [Step 4: Setting Up the "Face" (Frontend)](step-4-setting-up-the-face-frontend)
+
+   * [Step 5: Turning It On!](#step-5-turning-it-on)
+
+6. [Putting It on the Internet (Deployment)](#️-putting-it-on-the-internet-deployment)
+
+7. [Meet the Creator](#meet-the-creator)
 
 ---
 
