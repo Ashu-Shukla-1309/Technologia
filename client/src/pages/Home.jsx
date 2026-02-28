@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { toast } from 'react-hot-toast'; // 🚀 TOAST IMPORT
+import { toast } from 'react-hot-toast';
+import { Link } from 'react-router-dom'; // 🚀 NEW: Imported Link for navigation
 
 const Home = ({ products = [], isLoading, addToCart, searchTerm }) => {
   const [index, setIndex] = useState(0);
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [unitCounts, setUnitCounts] = useState({});
   const [expandedId, setExpandedId] = useState(null); 
-  
   
   const [sortOrder, setSortOrder] = useState("default");
   const [wishlist, setWishlist] = useState(() => {
@@ -24,7 +24,6 @@ const Home = ({ products = [], isLoading, addToCart, searchTerm }) => {
     "https://pngimg.com/uploads/gamepad/gamepad_PNG62.png",                                
     "https://m.media-amazon.com/images/I/61fB9i7y81L.png"                
   ];
-
 
   useEffect(() => {
     const masterTimer = setInterval(() => {
@@ -193,7 +192,8 @@ const Home = ({ products = [], isLoading, addToCart, searchTerm }) => {
                     {isWishlisted ? '❤️' : '🤍'}
                   </button>
 
-                  <div className="h-64 flex items-center justify-center mb-6 bg-slate-50 rounded-2xl p-4 overflow-hidden border border-slate-100 group relative">
+                  {/* 🚀 NEW: Clickable Image wrapping Link */}
+                  <Link to={`/product/${product._id}`} className="block h-64 flex items-center justify-center mb-6 bg-slate-50 rounded-2xl p-4 overflow-hidden border border-slate-100 group relative">
                     <motion.img 
                       whileHover={{ scale: 1.1 }} 
                       transition={{ duration: 0.4 }} 
@@ -201,11 +201,15 @@ const Home = ({ products = [], isLoading, addToCart, searchTerm }) => {
                       alt={product.name} 
                       className={`h-full object-contain mix-blend-multiply drop-shadow-md group-hover:drop-shadow-xl transition-all ${!isStocked && 'opacity-50 grayscale'}`} 
                     />
-                  </div>
+                  </Link>
                   
                   <div className="px-2 pb-2 flex-1 flex flex-col">
                     <p className="text-xs text-blue-600 font-bold uppercase tracking-wider mb-2">{product.category}</p>
-                    <h3 className="font-bold text-xl text-gray-900 mb-1 line-clamp-2 leading-tight">{product.name}</h3>
+                    
+                    {/* 🚀 NEW: Clickable Title wrapping Link */}
+                    <Link to={`/product/${product._id}`}>
+                      <h3 className="font-bold text-xl text-gray-900 mb-1 line-clamp-2 leading-tight hover:text-blue-600 transition-colors">{product.name}</h3>
+                    </Link>
                     
                     <button 
                       onClick={() => setExpandedId(expandedId === product._id ? null : product._id)}

@@ -204,9 +204,14 @@ const Navbar = ({ cart, removeFromCart, updateQuantity, isOpen, setIsOpen, clear
                         <p className="text-xs text-gray-500">Account</p>
                         <p className="text-sm font-bold text-gray-900 truncate">{userEmail}</p>
                      </div>
-                     {isAdmin && (
-                       <Link onClick={() => setIsProfileDropdownOpen(false)} to="/add" className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition">Inventory Management</Link>
+                     
+                     {/* 👈 UPDATED: Both Admins AND Sellers can access Inventory Management */}
+                     {(isAdmin || localStorage.getItem('userRole') === 'seller') && (
+                       <Link onClick={() => setIsProfileDropdownOpen(false)} to="/add" className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition font-bold">
+                         Inventory Management
+                       </Link>
                      )}
+
                      <Link onClick={() => setIsProfileDropdownOpen(false)} to="/profile" className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition">My Profile</Link>
                      <Link onClick={() => setIsProfileDropdownOpen(false)} to="/orders" className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition">Order History</Link>
                      <div className="border-t border-gray-100 mt-2 pt-2">

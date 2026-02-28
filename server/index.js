@@ -50,7 +50,7 @@ const authLimiter = rateLimit({
 });
 
 // ==========================================
-// 🛡️ SECURITY MIDDLEWARE (NEW)
+// 🛡️ SECURITY MIDDLEWARE
 // ==========================================
 const authenticateToken = (req, res, next) => {
   const authHeader = req.header('Authorization');
@@ -60,7 +60,7 @@ const authenticateToken = (req, res, next) => {
 
   try {
     const verified = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = verified; // Contains { id, email, isAdmin }
+    req.user = verified; // Contains { id, email, isAdmin, role }
     next();
   } catch (err) {
     res.status(403).json({ error: "Invalid or expired token." });
@@ -70,6 +70,14 @@ const authenticateToken = (req, res, next) => {
 const verifyAdmin = (req, res, next) => {
   if (!req.user || !req.user.isAdmin) {
     return res.status(403).json({ error: "Unauthorized. Admin privileges required." });
+  }
+  next();
+};
+
+// 🛡️ NEW: Middleware for both Sellers and Admins
+const verifySellerOrAdmin = (req, res, next) => {
+  if (!req.user || (!req.user.isAdmin && req.user.role !== 'seller')) {
+    return res.status(403).json({ error: "Unauthorized. Seller or Admin privileges required." });
   }
   next();
 };
@@ -99,7 +107,8 @@ const Product = mongoose.model('Product', new mongoose.Schema({
   inStock: { type: Boolean, default: true },
   reviews: [reviewSchema], 
   rating: { type: Number, default: 0 }, 
-  numReviews: { type: Number, default: 0 }
+  numReviews: { type: Number, default: 0 },
+  sellerEmail: String // 👈 NEW: Tracks which seller added the product
 }));
 
 const Order = mongoose.model('Order', new mongoose.Schema({
@@ -117,10 +126,17 @@ const Order = mongoose.model('Order', new mongoose.Schema({
   cancelDate: Date      
 }));
 
+// Replace your existing User schema with this:
 const User = mongoose.model('User', new mongoose.Schema({
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
-  isVerified: { type: Boolean, default: false }
+  isVerified: { type: Boolean, default: false },
+  role: { type: String, enum: ['customer', 'seller'], default: 'customer' },
+  name: { type: String, default: "" },          
+  phone: { type: String, default: "" },         
+  address: { type: String, default: "" },       
+  isVerifiedSeller: { type: Boolean, default: false },
+  isBanned: { type: Boolean, default: false } // 👈 NEW: Ban status
 }));
 
 const Otp = mongoose.model('Otp', new mongoose.Schema({
@@ -165,7 +181,7 @@ app.use('/api/auth/', authLimiter);
 
 app.post('/api/auth/register', async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, role } = req.body; // 👈 NEW: Extract role
     if (password.length < 6) return res.status(400).json({ error: "Password must be at least 6 characters" });
     
     let user = await User.findOne({ email });
@@ -174,11 +190,12 @@ app.post('/api/auth/register', async (req, res) => {
       if (user.isVerified) return res.status(400).json({ error: "This email is already registered" });
       const salt = await bcrypt.genSalt(10);
       user.password = await bcrypt.hash(password, salt);
+      user.role = role || 'customer'; // 👈 NEW: Save role if re-registering
       await user.save();
     } else {
       const salt = await bcrypt.genSalt(10);
       const hashedPassword = await bcrypt.hash(password, salt);
-      user = new User({ email, password: hashedPassword });
+      user = new User({ email, password: hashedPassword, role: role || 'customer' }); // 👈 NEW: Save role
       await user.save();
     }
 
@@ -268,6 +285,11 @@ app.post('/api/auth/login', async (req, res) => {
     const user = await User.findOne({ email });
     if (!user) return res.status(400).json({ error: "User not found" });
     
+    // 🛡️ NEW: Block Banned Users
+    if (user.isBanned) {
+      return res.status(403).json({ error: "Your account has been banned by the Administrator." });
+    }
+    
     const isAdmin = email === process.env.ADMIN_EMAIL;
 
     if (!user.isVerified && !isAdmin) {
@@ -277,14 +299,132 @@ app.post('/api/auth/login', async (req, res) => {
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(400).json({ error: "Invalid credentials" });
     
-    // 🛡️ SECURITY FIX: Added 'email' to the JWT Payload so backend knows exactly who is making requests
-    const token = jwt.sign({ id: user._id, email: user.email, isAdmin }, process.env.JWT_SECRET, { expiresIn: '2h' });
-    res.json({ token, email: user.email, isAdmin });
+    // 🛡️ SECURITY FIX: Include role in JWT
+    const token = jwt.sign({ id: user._id, email: user.email, isAdmin, role: user.role }, process.env.JWT_SECRET, { expiresIn: '2h' });
+    res.json({ token, email: user.email, isAdmin, role: user.role }); // 👈 NEW: Returned role
   } catch (err) {
     res.status(500).json({ error: "Login failed" });
   }
 });
+// ==========================================
+// 🧑‍💻 USER PROFILE & ADMIN ROUTES (NEW)
+// ==========================================
 
+// Get Current User Profile
+app.get('/api/users/me', authenticateToken, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select('-password');
+    res.json(user);
+  } catch (err) { res.status(500).json({ error: "Failed to fetch profile" }); }
+});
+
+// Update Current User Profile (Name & Phone)
+app.put('/api/users/me', authenticateToken, async (req, res) => {
+  try {
+    const { name, phone, address } = req.body; // 👈 NEW: Extract address
+    const updatedUser = await User.findByIdAndUpdate(
+      req.user.id, 
+      { name, phone, address }, // 👈 NEW: Save address
+      { new: true }
+    ).select('-password');
+    res.json(updatedUser);
+  } catch (err) { res.status(500).json({ error: "Failed to update profile" }); }
+});
+
+// Admin: Get all Sellers
+app.get('/api/users/sellers', authenticateToken, verifyAdmin, async (req, res) => {
+  try {
+    const sellers = await User.find({ role: 'seller' }).select('-password');
+    res.json(sellers);
+  } catch (err) { res.status(500).json({ error: "Failed to fetch sellers" }); }
+});
+// Admin: Ban or Unban a Seller
+app.put('/api/users/:id/ban', authenticateToken, verifyAdmin, async (req, res) => {
+  try {
+    const { isBanned, reason } = req.body;
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    user.isBanned = isBanned;
+    await user.save();
+
+    if (isBanned) {
+      // Send Ban Email
+      const mailOptions = {
+        to: user.email,
+        subject: "Technologia: Account Suspended",
+        html: `
+          <div style="font-family: Arial; padding: 20px; border: 1px solid #f87171; border-radius: 10px;">
+            <h2 style="color: #dc2626;">Account Suspended</h2>
+            <p>Your seller account on Technologia has been suspended by the administrator.</p>
+            <div style="background-color: #fef2f2; padding: 15px; border-left: 4px solid #ef4444; margin-top: 15px;">
+              <strong>Reason provided by Admin:</strong><br/>
+              <i>"${reason}"</i>
+            </div>
+            <p style="color: #6b7280; font-size: 12px; margin-top: 20px;">If you believe this is an error, please contact support.</p>
+          </div>
+        `
+      };
+      sendEmail(mailOptions, "ACCOUNT BANNED");
+    } else {
+      // Send Unban Email
+      const mailOptions = {
+        to: user.email,
+        subject: "Technologia: Account Restored",
+        html: `<h2>Account Restored</h2><p>Your seller account has been successfully unbanned. You may now log in and resume selling.</p>`
+      };
+      sendEmail(mailOptions, "ACCOUNT UNBANNED");
+    }
+
+    res.json(user);
+  } catch (err) { res.status(500).json({ error: "Failed to update ban status" }); }
+});
+
+// Admin: Permanently Delete a Seller
+app.delete('/api/users/:id', authenticateToken, verifyAdmin, async (req, res) => {
+  try {
+    const { reason } = req.body;
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    // Optional: Delete all products belonging to this seller
+    await Product.deleteMany({ sellerEmail: user.email });
+    
+    // Delete the user
+    await User.findByIdAndDelete(req.params.id);
+
+    // Send Deletion Email
+    const mailOptions = {
+      to: user.email,
+      subject: "Technologia: Account Terminated",
+      html: `
+        <div style="font-family: Arial; padding: 20px; border: 1px solid #7f1d1d; border-radius: 10px;">
+          <h2 style="color: #991b1b;">Account Terminated</h2>
+          <p>Your seller account and all associated listings on Technologia have been permanently deleted by the administrator.</p>
+          <div style="background-color: #fef2f2; padding: 15px; border-left: 4px solid #ef4444; margin-top: 15px;">
+            <strong>Reason provided by Admin:</strong><br/>
+            <i>"${reason}"</i>
+          </div>
+        </div>
+      `
+    };
+    sendEmail(mailOptions, "ACCOUNT DELETED");
+
+    res.json({ message: "Seller deleted successfully" });
+  } catch (err) { res.status(500).json({ error: "Failed to delete seller" }); }
+});
+// Admin: Toggle Verified Seller Status
+app.put('/api/users/:id/verify-seller', authenticateToken, verifyAdmin, async (req, res) => {
+  try {
+    const { isVerifiedSeller } = req.body;
+    const user = await User.findByIdAndUpdate(
+      req.params.id, 
+      { isVerifiedSeller }, 
+      { new: true }
+    ).select('-password');
+    res.json(user);
+  } catch (err) { res.status(500).json({ error: "Failed to update seller status" }); }
+});
 
 // ==========================================
 // 📦 PRODUCT ROUTES
@@ -292,8 +432,20 @@ app.post('/api/auth/login', async (req, res) => {
 
 app.get('/api/products', async (req, res) => {
   try {
-    const products = await Product.find().sort({ _id: -1 });
-    res.json(products);
+    // .lean() makes the documents plain JS objects so we can attach seller data
+    const products = await Product.find().sort({ _id: -1 }).lean();
+    
+    // Fetch all sellers to attach to products
+    const sellers = await User.find({ role: 'seller' }).select('email name isVerifiedSeller').lean();
+    const sellerMap = {};
+    sellers.forEach(s => sellerMap[s.email] = s);
+
+    const enrichedProducts = products.map(p => ({
+      ...p,
+      seller: p.sellerEmail ? sellerMap[p.sellerEmail] : null
+    }));
+
+    res.json(enrichedProducts);
   } catch (err) {
     res.status(500).json({ error: "Failed to fetch products" });
   }
@@ -301,18 +453,24 @@ app.get('/api/products', async (req, res) => {
 
 app.get('/api/products/:id', async (req, res) => {
   try {
-    const product = await Product.findById(req.params.id);
+    const product = await Product.findById(req.params.id).lean();
     if (!product) return res.status(404).json({ error: "Product not found" });
+    
+    // Attach full seller details for the product page
+    if (product.sellerEmail) {
+       const seller = await User.findOne({ email: product.sellerEmail }).select('name email phone isVerifiedSeller').lean();
+       product.seller = seller;
+    }
+    
     res.json(product);
   } catch (err) {
     res.status(500).json({ error: "Failed to fetch product details" });
   }
 });
-
-// 🛡️ SECURITY FIX: Only Admins can add/edit/delete
-app.post('/api/products', authenticateToken, verifyAdmin, async (req, res) => {
+// 🛡️ SECURITY FIX: Sellers and Admins can add products
+app.post('/api/products', authenticateToken, verifySellerOrAdmin, async (req, res) => {
     try {
-        const newProduct = new Product(req.body);
+        const newProduct = new Product({ ...req.body, sellerEmail: req.user.email }); // 👈 NEW: Attach seller email
         await newProduct.save();
         res.json(newProduct);
     } catch (err) {
@@ -320,8 +478,17 @@ app.post('/api/products', authenticateToken, verifyAdmin, async (req, res) => {
     }
 });
 
-app.put('/api/products/:id', authenticateToken, verifyAdmin, async (req, res) => {
+// 🛡️ SECURITY FIX: Sellers can only edit their own products
+app.put('/api/products/:id', authenticateToken, verifySellerOrAdmin, async (req, res) => {
   try {
+    const product = await Product.findById(req.params.id);
+    if (!product) return res.status(404).json({ error: "Product not found" });
+
+    // Ensure seller owns the product (Admins bypass this)
+    if (!req.user.isAdmin && product.sellerEmail !== req.user.email) {
+      return res.status(403).json({ error: "You can only edit your own products." });
+    }
+
     const updatedProduct = await Product.findByIdAndUpdate(
       req.params.id, 
       req.body, 
@@ -333,8 +500,17 @@ app.put('/api/products/:id', authenticateToken, verifyAdmin, async (req, res) =>
   }
 });
 
-app.delete('/api/products/:id', authenticateToken, verifyAdmin, async (req, res) => {
+// 🛡️ SECURITY FIX: Sellers can only delete their own products
+app.delete('/api/products/:id', authenticateToken, verifySellerOrAdmin, async (req, res) => {
     try {
+        const product = await Product.findById(req.params.id);
+        if (!product) return res.status(404).json({ error: "Product not found" });
+
+        // Ensure seller owns the product (Admins bypass this)
+        if (!req.user.isAdmin && product.sellerEmail !== req.user.email) {
+          return res.status(403).json({ error: "You can only delete your own products." });
+        }
+
         await Product.findByIdAndDelete(req.params.id);
         res.json({ message: "Product successfully removed" });
     } catch (err) {
@@ -348,7 +524,7 @@ app.delete('/api/products/:id', authenticateToken, verifyAdmin, async (req, res)
 app.post('/api/products/:id/reviews', authenticateToken, async (req, res) => {
   try {
     const { rating, comment, userName } = req.body;
-    const userEmail = req.user.email; // Extracted securely from JWT
+    const userEmail = req.user.email; 
 
     const hasBought = await Order.findOne({ email: userEmail, status: "Delivered", "items.productId": req.params.id });
     if (!hasBought && !req.user.isAdmin) return res.status(403).json({ error: "You can only review delivered items." });
@@ -397,7 +573,7 @@ app.post('/api/orders', authenticateToken, async (req, res) => {
     }
 
     const newOrder = new Order({ 
-      email: req.user.email, // 🛡️ Pulled from token, not body
+      email: req.user.email, 
       customerName, 
       phone, 
       address, 

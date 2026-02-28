@@ -24,6 +24,8 @@ function App() {
   const [searchTerm, setSearchTerm] = useState("");
   const [token, setToken] = useState(localStorage.getItem('token'));
   const [isAdmin, setIsAdmin] = useState(localStorage.getItem('isAdmin') === 'true');
+  // 🚀 NEW: State to track user role
+  const [userRole, setUserRole] = useState(localStorage.getItem('userRole') || 'customer');
 
   const fetchProducts = async () => {
     setIsLoading(true);
@@ -53,7 +55,6 @@ function App() {
       return [...prevCart, { ...product, quantity }];
     });
     
-    // 🚀 We keep the toast notification, but we REMOVED the code that forces the cart open!
     toast.success(`${product.name} added to cart!`); 
   };
 
@@ -76,9 +77,11 @@ function App() {
     localStorage.removeItem('token');
     localStorage.removeItem('userEmail');
     localStorage.removeItem('isAdmin');
+    localStorage.removeItem('userRole'); // 🚀 NEW: Clear role on logout
 
     setToken(null);
     setIsAdmin(false);
+    setUserRole('customer');
     toast.success("Logged out successfully");
     window.location.href = "/";
   };
@@ -113,7 +116,8 @@ function App() {
               isAdmin={isAdmin} 
             />
           } />
-          <Route path="/login" element={<Login setToken={setToken} setIsAdmin={setIsAdmin} />} />
+          {/* 🚀 NEW: Passed setUserRole to Login */}
+          <Route path="/login" element={<Login setToken={setToken} setIsAdmin={setIsAdmin} setUserRole={setUserRole} />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/verify" element={<VerifyOTP />} />
           <Route path="/orders" element={<Orders />} />
@@ -122,7 +126,9 @@ function App() {
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/profile" element={token ? <Profile logout={logout} /> : <Navigate to="/login" />} />
           <Route path="/product/:id" element={<ProductDetails addToCart={addToCart} />} />
-          <Route path="/add" element={isAdmin ? <AddProduct fetchProducts={fetchProducts} /> : <Navigate to="/" />} />
+          
+          {/* 🚀 NEW: Protected route now allows Admins OR Sellers */}
+          <Route path="/add" element={(isAdmin || userRole === 'seller') ? <AddProduct fetchProducts={fetchProducts} /> : <Navigate to="/" />} />
         </Routes>
 
         <Footer />

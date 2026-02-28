@@ -19,6 +19,11 @@ const Orders = () => {
   const [cancelOrderDetails, setCancelOrderDetails] = useState(null);
   const [cancelReason, setCancelReason] = useState('');
 
+  // 🚀 NEW: Review Modal State
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [reviewItem, setReviewItem] = useState(null);
+  const [reviewForm, setReviewForm] = useState({ rating: 5, comment: '', userName: '' });
+
   const userEmail = localStorage.getItem('userEmail');
   const isAdmin = localStorage.getItem('isAdmin') === 'true';
 
@@ -33,7 +38,6 @@ const Orders = () => {
   const fetchOrders = async () => {
     setIsLoading(true);
     try {
-      // 🛡️ Backend securely handles Admin vs User logic via the token now. No need to pass email in URL.
       const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/orders`, authHeaders);
       setOrders(res.data);
     } catch (err) {
@@ -100,6 +104,34 @@ const Orders = () => {
       fetchOrders(); 
     } catch (err) {
       toast.error(err.response?.data?.error || "Failed to cancel order", { id: loadingToast });
+    }
+  };
+
+  // 🚀 NEW: Open Review Modal
+  const openReviewModal = (item) => {
+    setReviewItem(item);
+    // Auto-fill username based on email prefix if available
+    const defaultName = userEmail ? userEmail.split('@')[0] : 'Customer';
+    setReviewForm({ rating: 5, comment: '', userName: defaultName });
+    setIsReviewModalOpen(true);
+  };
+
+  // 🚀 NEW: Submit Review Function
+  const handleReviewSubmit = async (e) => {
+    e.preventDefault();
+    if (!reviewForm.comment.trim()) return toast.error("Please provide a review comment.");
+    if (!reviewForm.userName.trim()) return toast.error("Please provide a name.");
+    
+    const loadingToast = toast.loading("Submitting review...");
+    try {
+      // Backend expects: rating, comment, userName
+      const productId = reviewItem.productId || reviewItem._id;
+      await axios.post(`${import.meta.env.VITE_API_URL}/api/products/${productId}/reviews`, reviewForm, authHeaders);
+      
+      toast.success("Review submitted successfully! Thank you.", { id: loadingToast });
+      setIsReviewModalOpen(false);
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Failed to submit review", { id: loadingToast });
     }
   };
 
@@ -210,16 +242,37 @@ const Orders = () => {
                   </div>
 
                   {/* Order Items */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {order.items.map((item, index) => (
-                      <div key={index} className="flex items-center gap-4 bg-gray-50 p-4 rounded-2xl border border-gray-100">
-                        <img src={item.image} alt={item.name} className="w-16 h-16 object-contain mix-blend-multiply" />
-                        <div>
-                          <p className="font-bold text-gray-900 line-clamp-1">{item.name}</p>
-                          <p className="text-gray-500 text-sm">Qty: {item.quantity || 1} <span className="mx-2">•</span> ₹{(item.price * (item.quantity || 1)).toLocaleString('en-IN')}</p>
+                  <div className="grid grid-cols-1 gap-4">
+                    {order.items.map((item, index) => {
+                      const itemProductId = item.productId || item._id; // Fallback for robust routing
+                      
+                      return (
+                      <div key={index} className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-gray-50 p-4 rounded-2xl border border-gray-100">
+                        
+                        {/* 🚀 NEW: Image and Title are now clickable links */}
+                        <div className="flex items-center gap-4">
+                          <Link to={`/product/${itemProductId}`}>
+                            <img src={item.image} alt={item.name} className="w-16 h-16 object-contain mix-blend-multiply hover:scale-105 transition-transform" />
+                          </Link>
+                          <div>
+                            <Link to={`/product/${itemProductId}`} className="font-bold text-gray-900 line-clamp-1 hover:text-blue-600 transition-colors">
+                              {item.name}
+                            </Link>
+                            <p className="text-gray-500 text-sm">Qty: {item.quantity || 1} <span className="mx-2">•</span> ₹{(item.price * (item.quantity || 1)).toLocaleString('en-IN')}</p>
+                          </div>
                         </div>
+
+                        {/* 🚀 NEW: Write Review Button (Only shows if Delivered and User is not Admin) */}
+                        {!isAdmin && order.status === "Delivered" && (
+                          <button 
+                            onClick={() => openReviewModal(item)}
+                            className="text-xs font-bold bg-white border border-yellow-300 text-yellow-700 px-4 py-2 rounded-xl hover:bg-yellow-50 transition shadow-sm whitespace-nowrap"
+                          >
+                            ⭐ Write Review
+                          </button>
+                        )}
                       </div>
-                    ))}
+                    )})}
                   </div>
 
                   {/* Admin Dashboard Context (Shows why it was cancelled) */}
@@ -248,7 +301,7 @@ const Orders = () => {
                           onClick={() => openReturnModal(order)}
                           className="bg-white border-2 border-slate-900 text-slate-900 px-6 py-2 rounded-full font-bold hover:bg-slate-900 hover:text-white transition-all text-sm shadow-sm"
                         >
-                          Return or Replace Item
+                          Return or Replace Order
                         </button>
                       )}
                     </div>
@@ -266,6 +319,70 @@ const Orders = () => {
           </div>
         )}
       </div>
+
+      {/* 🚀 NEW: REVIEW MODAL */}
+      <AnimatePresence>
+        {isReviewModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsReviewModalOpen(false)} className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm" />
+            
+            <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden z-10 p-8 border border-gray-100">
+              <h2 className="text-2xl font-black text-gray-900 mb-2">Rate & Review</h2>
+              <p className="text-gray-500 text-sm mb-6 font-medium line-clamp-1">{reviewItem?.name}</p>
+              
+              <form onSubmit={handleReviewSubmit} className="space-y-5">
+                
+                {/* Star Rating */}
+                <div>
+                  <label className="block text-gray-700 font-bold mb-2 text-sm">Rating</label>
+                  <div className="flex gap-2">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button 
+                        type="button" 
+                        key={star} 
+                        onClick={() => setReviewForm({...reviewForm, rating: star})} 
+                        className={`text-4xl transition-colors hover:scale-110 ${reviewForm.rating >= star ? 'text-yellow-400' : 'text-gray-200'}`}
+                      >
+                        ★
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Name Input */}
+                <div>
+                  <label className="block text-gray-700 font-bold mb-2 text-sm">Display Name</label>
+                  <input 
+                    type="text" 
+                    value={reviewForm.userName} 
+                    onChange={(e) => setReviewForm({...reviewForm, userName: e.target.value})} 
+                    placeholder="Your Name" 
+                    className="w-full bg-gray-50 border border-gray-200 p-4 rounded-xl text-gray-900 outline-none focus:border-blue-500 focus:bg-white transition-all shadow-sm"
+                    required
+                  />
+                </div>
+
+                {/* Comment Textarea */}
+                <div>
+                  <label className="block text-gray-700 font-bold mb-2 text-sm">Review Comment</label>
+                  <textarea 
+                    value={reviewForm.comment} 
+                    onChange={(e) => setReviewForm({...reviewForm, comment: e.target.value})} 
+                    placeholder="What did you like or dislike about this product?" 
+                    className="w-full bg-gray-50 border border-gray-200 p-4 rounded-xl text-gray-900 outline-none focus:border-blue-500 focus:bg-white transition-all shadow-sm resize-none h-28"
+                    required
+                  />
+                </div>
+
+                <div className="flex gap-4 mt-2">
+                  <button type="button" onClick={() => setIsReviewModalOpen(false)} className="flex-1 bg-gray-100 text-gray-700 py-3 rounded-xl font-bold hover:bg-gray-200 transition">Cancel</button>
+                  <button type="submit" className="flex-1 bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition shadow-md shadow-blue-500/30">Post Review</button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* RETURN / REPLACE MODAL */}
       <AnimatePresence>

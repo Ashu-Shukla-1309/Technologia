@@ -2,7 +2,7 @@ import { useState } from 'react';
 import axios from 'axios';
 import { useNavigate, Link } from 'react-router-dom';
 
-const LoginTemp = ({ setToken, setIsAdmin }) => {
+const LoginTemp = ({ setToken, setIsAdmin, setUserRole }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const navigate = useNavigate();
@@ -15,10 +15,12 @@ const LoginTemp = ({ setToken, setIsAdmin }) => {
       // SAVE EVERYTHING TO STORAGE
       localStorage.setItem('token', res.data.token);
       localStorage.setItem('isAdmin', res.data.isAdmin);
-      localStorage.setItem('userEmail', res.data.email); // <--- CRITICAL UPDATE
+      localStorage.setItem('userEmail', res.data.email); 
+      localStorage.setItem('userRole', res.data.role); // 🚀 NEW: Save Role
       
       setToken(res.data.token);
       setIsAdmin(res.data.isAdmin);
+      setUserRole(res.data.role); // 🚀 NEW: Update State
       
       navigate('/');
     } catch (err) {
