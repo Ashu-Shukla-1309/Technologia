@@ -66,7 +66,13 @@ We built this to be as secure as a real, professional store:
 * **Hidden Passwords (Hashing):** We never save your real password. We scramble it into a secret code using something called `bcryptjs`. Even if someone broke into the database, they couldn't read the passwords.
 * **Secret Keys (.env):** All the sensitive stuff—like the keys to the database, the secret codes for logins, and the owner's payment details—are locked away in a hidden file called `.env`.
 * **Digital ID Cards (JWT):** When you log in, the server gives you a temporary "digital ID card" (a JSON Web Token). You show this card to do things like view your orders, protecting your data.
-
+* **Unstealable ID Cards (HTTP-Only Cookies):** Instead of saving your login token in the browser where it could be stolen (localStorage), we lock it inside an "HTTP-Only Cookie" that hackers cannot access.
+* **Silent Session Renewals (Refresh Tokens)**: For maximum security, your main access token expires every 15 minutes. But don't worry—the website uses a clever background "Interceptor" to silently fetch a new token before you even notice, keeping you logged in without interruptions!
+* **Data Vault (Encryption at Rest)**: We scramble sensitive personal data (like real names, addresses, and phone numbers) before it ever goes into the database. Even if a super-hacker stole the entire database, they would only see random gibberish!
+* **Fake Request Blocker (CSRF Protection):** We use a highly secure "Double-Submit Cookie" pattern. This stops malicious websites from tricking your browser into buying or deleting things behind your back while you are logged in.
+* **Bulletproof Math (Financial Safety):** JavaScript is bad at decimal math. To prevent hackers from exploiting floating-point errors to change cart totals, our server strictly calculates all money in whole integers (paise/cents) before converting it back to rupees/dollars.
+* **Server Blackbox (Audit Logging):** Every single click, login attempt, and data request is permanently recorded into a secure server log file, leaving a perfect trail for admins to track exactly who did what.
+* **3-Strike Lockouts:** We upgraded the rate limiters. If someone fails to type the correct password 5 times in a row, their account is completely locked for 15 minutes to stop brute-force hacking.
 <a name="tech-stack"></a>
 
 ## 🛠️ What is it Built With? (Tech Stack)
@@ -82,6 +88,8 @@ We built this to be as secure as a real, professional store:
 * **Node.js & Express.js:** The engine that handles requests (like "add this to cart" or "ban this user").
 * **MongoDB:** The giant digital filing cabinet where we store all the users, gadgets, and orders securely.
 * **Brevo API:** The super-fast mailman that delivers our OTP emails, ban notifications, and receipts.
+* **Morgan**: The "blackbox" logger that records every single server request.
+* **Mongoose-Field-Encryption:** The vault lock that automatically encrypts and decrypts user data on the fly.
 
 <a name="design-system"></a>
 
@@ -162,6 +170,7 @@ EMAIL_USER=your_email@gmail.com
 ADMIN_EMAIL=your_email@gmail.com
 CLIENT_URL=http://localhost:5173
 EMAIL_PASS=your_app_password
+ENCRYPTION_KEY=YourSuperSecret32CharacterKeyHere!
 
 ```
 
@@ -176,6 +185,7 @@ EMAIL_PASS=your_app_password
 
 
 * **`JWT_SECRET`**: Just type any long, random mix of letters and numbers here. It's a secret code only your server knows.
+* **`ENCRYPTION_KEY`**: This is the master key that scrambles the database. It must be exactly 32 characters long (no spaces). You can generate a random one using a password manager. Warning: If you lose this key, you lose access to all user addresses and phone numbers!
 * **`BREVO_API_KEY`**:
 1. Go to [Brevo.com](https://www.google.com/search?q=https://www.brevo.com/) and create a free account.
 2. Go to your account settings and find "SMTP & API".
