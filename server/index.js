@@ -508,7 +508,8 @@ app.get('/api/products/:id', async (req, res) => {
     if (!product) return res.status(404).json({ error: "Product not found" });
     
     if (product.sellerEmail) {
-       const seller = await User.findOne({ email: product.sellerEmail }).select('name email phone isVerifiedSeller').lean();
+       // 🛡️ PRIVACY FIX: Only expose the seller's public-facing info
+const seller = await User.findOne({ email: product.sellerEmail }).select('name email isVerifiedSeller').lean();
        product.seller = seller;
     }
     
