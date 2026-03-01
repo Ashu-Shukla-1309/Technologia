@@ -16,7 +16,8 @@ const {
     generateSecureOTP, 
     isValidEmail, 
     isValidPassword, 
-    applySecurityMiddleware 
+    applySecurityMiddleware,
+    otpVerificationLimiter
 } = require('./security');
 
 const { 
@@ -51,13 +52,12 @@ app.use(verifyCsrf);
 
 // 🛡️ SECURITY FIX: Endpoint to provide the CSRF token to the legitimate frontend
 app.get('/api/csrf-token', (req, res) => {
-    // Reuse existing token if it exists (handles users opening multiple tabs)
     let token = req.cookies['csrfToken'];
     
     if (!token) {
         token = crypto.randomBytes(32).toString('hex');
         res.cookie('csrfToken', token, {
-            httpOnly: true,
+            httpOnly: false,
             secure: true,
             sameSite: 'none'
         });
@@ -555,10 +555,26 @@ app.delete('/api/products/:id', authenticateToken, verifySellerOrAdmin, async (r
 app.post('/api/products/:id/reviews', authenticateToken, async (req, res) => {
   try {
     const { rating, comment, userName } = req.body;
-    const userEmail = req.user.email; 
+    const userEmail = req.user.email;
+    const productId = req.params.id;
 
-    const hasBought = await Order.findOne({ email: userEmail, status: "Delivered", "items.productId": req.params.id });
-    if (!hasBought && !req.user.isAdmin) return res.status(403).json({ error: "You can only review delivered items." });
+    // 🛡️ THE FINAL FIX: Search for the product by its '_id' inside the items array
+    const hasBought = await Order.findOne({ 
+      email: { $regex: new RegExp(`^${userEmail}$`, 'i') }, // Case-insensitive email
+      status: "Delivered",
+      "items": { 
+        $elemMatch: { 
+          // Checks for both String and ObjectId versions of the ID
+          _id: { $in: [productId, new mongoose.Types.ObjectId(productId)] } 
+        } 
+      }
+    });
+
+    if (!hasBought && !req.user.isAdmin) {
+      return res.status(403).json({ 
+        error: "You can only review items that have been delivered to your account." 
+      });
+    }
 
     const product = await Product.findById(req.params.id);
     if (!product) return res.status(404).json({ error: "Product not found" });

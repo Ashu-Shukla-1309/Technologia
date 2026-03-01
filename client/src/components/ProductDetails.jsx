@@ -41,7 +41,34 @@ const ProductDetails = ({ addToCart }) => {
     
     if (!isLoggedIn) return toast.error("Please login to review!");
     
-    if (!token) return toast.error("Please login to review!");
+    const handleReviewSubmit = async (e) => {
+    e.preventDefault();
+    
+    // 🛡️ SECURITY FIX: Check sessionStorage instead of the old 'token' variable
+    const userEmail = sessionStorage.getItem('userEmail');
+    const userName = userEmail ? userEmail.split('@')[0] : "User";
+
+    if (!userEmail) {
+      return toast.error("Please login to review!");
+    }
+
+    try {
+      // Note: You no longer need to manually pass 'token' in headers 
+      // because Axios is sending the HTTP-Only cookie automatically!
+      await axios.post(`/api/products/${id}/reviews`, {
+        rating,
+        comment,
+        userName
+      });
+
+      toast.success("Review submitted successfully!");
+      setComment("");
+      setRating(5);
+      fetchProduct(); // Refresh the product to show the new review
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Failed to submit review");
+    }
+  };
     if (!newComment.trim()) return toast.error("Please enter a comment.");
 
     setIsSubmitting(true);

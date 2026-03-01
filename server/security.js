@@ -32,6 +32,15 @@ const authLimiter = rateLimit({
     message: { error: "Security alert: Too many authentication attempts. Please try again later." }
 });
 
+// 🛡️ SECURITY FIX: Prevent OTP Brute-Forcing
+const otpVerificationLimiter = rateLimit({
+    windowMs: 5 * 60 * 1000, // 5 minutes
+    max: 5, // Maximum 5 guesses before locking them out
+    message: { error: "Too many failed attempts. Please request a new code." },
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+
 const passwordResetLimiter = rateLimit({
     windowMs: 60 * 60 * 1000, // 1 hour
     max: 5,
@@ -107,5 +116,6 @@ module.exports = {
     generateSecureOTP,
     isValidEmail,
     isValidPassword,
-    applySecurityMiddleware
+    applySecurityMiddleware,
+    otpVerificationLimiter
 };
