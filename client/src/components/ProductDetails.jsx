@@ -36,8 +36,10 @@ const ProductDetails = ({ addToCart }) => {
 
   const handleReviewSubmit = async (e) => {
     e.preventDefault();
-    const token = localStorage.getItem('token');
-    const userName = localStorage.getItem('userEmail')?.split('@')[0] || "User";
+    const isLoggedIn = sessionStorage.getItem('userEmail');
+    const userName = sessionStorage.getItem('userEmail')?.split('@')[0] || "User";
+    
+    if (!isLoggedIn) return toast.error("Please login to review!");
     
     if (!token) return toast.error("Please login to review!");
     if (!newComment.trim()) return toast.error("Please enter a comment.");

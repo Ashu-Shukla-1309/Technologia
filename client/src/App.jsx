@@ -16,16 +16,49 @@ import Profile from './pages/Profile';
 import Wishlist from './pages/Wishlist';
 import ProductDetails from './components/ProductDetails';
 
+axios.defaults.baseURL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+axios.defaults.withCredentials = true;
+
+// 🛡️ SECURITY FIX: Silent Refresh Token Interceptor
+axios.interceptors.response.use(
+  (response) => {
+    return response; 
+  },
+  async (error) => {
+    const originalRequest = error.config;
+    
+    // If the error is 401 (Unauthorized) and we haven't retried yet
+    if (error.response && error.response.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+      
+      try {
+        // Silently hit the refresh endpoint
+        await axios.post('/api/auth/refresh');
+        
+        // If successful, retry the exact request the user was trying to make
+        return axios(originalRequest);
+        
+      } catch (refreshError) {
+        // If refresh token is expired or invalid, log them out completely
+        sessionStorage.clear();
+        window.location.href = '/login';
+        return Promise.reject(refreshError);
+      }
+    }
+    
+    return Promise.reject(error);
+  }
+);
+
 function App() {
   const [products, setProducts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [cart, setCart] = useState([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [token, setToken] = useState(localStorage.getItem('token'));
-  const [isAdmin, setIsAdmin] = useState(localStorage.getItem('isAdmin') === 'true');
-  // 🚀 NEW: State to track user role
-  const [userRole, setUserRole] = useState(localStorage.getItem('userRole') || 'customer');
+  const [token, setToken] = useState(sessionStorage.getItem('userEmail') ? true : null);
+  const [isAdmin, setIsAdmin] = useState(sessionStorage.getItem('isAdmin') === 'true');
+  const [userRole, setUserRole] = useState(sessionStorage.getItem('userRole') || 'customer');
 
   const fetchProducts = async () => {
     setIsLoading(true);
@@ -41,7 +74,24 @@ function App() {
   };
 
   useEffect(() => {
-    fetchProducts();
+    const setupSecurityAndFetch = async () => {
+      try {
+        // 1. Fetch the CSRF Token first
+        const csrfRes = await axios.get('/api/csrf-token');
+        
+        // 2. Tell Axios to automatically attach it to all future headers
+        axios.defaults.headers.common['X-CSRF-Token'] = csrfRes.data.csrfToken;
+        
+        // 3. Proceed to fetch your products
+        fetchProducts();
+      } catch (err) {
+        console.error("Failed to initialize secure session:", err);
+        // Fallback to fetch products anyway in case of network blips
+        fetchProducts(); 
+      }
+    };
+
+    setupSecurityAndFetch();
   }, []);
 
   const addToCart = (product, quantity = 1) => {
@@ -73,11 +123,16 @@ function App() {
     toast.error("Item removed from cart", { icon: '🗑️' });
   };
 
-  const logout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('userEmail');
-    localStorage.removeItem('isAdmin');
-    localStorage.removeItem('userRole'); // 🚀 NEW: Clear role on logout
+  const logout = async () => {
+    try {
+      await axios.post('/api/auth/logout');
+    } catch(e) {
+      console.error(e)
+    }
+    
+    sessionStorage.removeItem('userEmail');
+    sessionStorage.removeItem('isAdmin');
+    sessionStorage.removeItem('userRole'); 
 
     setToken(null);
     setIsAdmin(false);

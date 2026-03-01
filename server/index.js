@@ -1,86 +1,70 @@
+const mongooseFieldEncryption = require("mongoose-field-encryption").fieldEncryption;
 require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
-const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
+const cookieParser = require('cookie-parser');
 const axios = require('axios');
+const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
+const morgan = require('morgan');
+
+// Import our new security modules
+const { 
+    generateSecureOTP, 
+    isValidEmail, 
+    isValidPassword, 
+    applySecurityMiddleware 
+} = require('./security');
+
+const { 
+    authenticateToken, 
+    verifyAdmin, 
+    verifySellerOrAdmin,
+    verifyCsrf
+} = require('./auth-middleware');
 
 const app = express();
 
-app.set('trust proxy', 1);
-app.use(helmet()); 
+// 🛡️ SECURITY FIX: Comprehensive Audit Logging
+// Create a logs directory if it doesn't exist
+const logDirectory = path.join(__dirname, 'logs');
+if (!fs.existsSync(logDirectory)) {
+    fs.mkdirSync(logDirectory);
+}
+// Create a write stream (in append mode)
+const accessLogStream = fs.createWriteStream(path.join(logDirectory, 'access.log'), { flags: 'a' });
+// Log all requests to the file in the standard Apache combined format
+app.use(morgan('combined', { stream: accessLogStream }));
 
-app.use(cors({ 
-  origin: [
-    'http://localhost:5173', 
-    'https://technologia-ibm.vercel.app',
-    process.env.CLIENT_URL
-  ].filter(Boolean), 
-  credentials: true 
-}));
+// 🛡️ Apply all security configs (CORS, Helmet, Rate Limiting, XSS, NoSQL Injection)
+applySecurityMiddleware(app);
 
 app.use(express.json({ limit: '10kb' })); 
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
+app.use(cookieParser()); // Required for reading HTTP-Only cookies
 
-app.use((req, res, next) => {
-  const sanitize = (obj) => {
-    if (obj instanceof Object) {
-      for (const key in obj) {
-        if (/^\$/.test(key) || /\./.test(key)) {
-          delete obj[key];
-        } else {
-          sanitize(obj[key]);
-        }
-      }
+// 🛡️ SECURITY FIX: Apply CSRF protection globally to all routes
+app.use(verifyCsrf);
+
+// 🛡️ SECURITY FIX: Endpoint to provide the CSRF token to the legitimate frontend
+app.get('/api/csrf-token', (req, res) => {
+    // Reuse existing token if it exists (handles users opening multiple tabs)
+    let token = req.cookies['csrfToken'];
+    
+    if (!token) {
+        token = crypto.randomBytes(32).toString('hex');
+        res.cookie('csrfToken', token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict'
+        });
     }
-  };
-  if (req.body) sanitize(req.body);
-  if (req.query) sanitize(req.query);
-  if (req.params) sanitize(req.params);
-  next();
+    
+    res.json({ csrfToken: token });
 });
-
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, 
-  max: 20,
-  message: { error: "Security alert: Too many attempts. Please try again later." }
-});
-
-// ==========================================
-// 🛡️ SECURITY MIDDLEWARE
-// ==========================================
-const authenticateToken = (req, res, next) => {
-  const authHeader = req.header('Authorization');
-  const token = authHeader && authHeader.split(' ')[1]; // Format: "Bearer TOKEN"
-
-  if (!token) return res.status(401).json({ error: "Access Denied. Please log in." });
-
-  try {
-    const verified = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = verified; // Contains { id, email, isAdmin, role }
-    next();
-  } catch (err) {
-    res.status(403).json({ error: "Invalid or expired token." });
-  }
-};
-
-const verifyAdmin = (req, res, next) => {
-  if (!req.user || !req.user.isAdmin) {
-    return res.status(403).json({ error: "Unauthorized. Admin privileges required." });
-  }
-  next();
-};
-
-// 🛡️ NEW: Middleware for both Sellers and Admins
-const verifySellerOrAdmin = (req, res, next) => {
-  if (!req.user || (!req.user.isAdmin && req.user.role !== 'seller')) {
-    return res.status(403).json({ error: "Unauthorized. Seller or Admin privileges required." });
-  }
-  next();
-};
 
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log("Shielded DB Connected Successfully"))
@@ -108,10 +92,10 @@ const Product = mongoose.model('Product', new mongoose.Schema({
   reviews: [reviewSchema], 
   rating: { type: Number, default: 0 }, 
   numReviews: { type: Number, default: 0 },
-  sellerEmail: String // 👈 NEW: Tracks which seller added the product
+  sellerEmail: String 
 }));
 
-const Order = mongoose.model('Order', new mongoose.Schema({
+const orderSchema = new mongoose.Schema({
   email: String, 
   customerName: String, 
   phone: String, 
@@ -124,10 +108,17 @@ const Order = mongoose.model('Order', new mongoose.Schema({
   status: { type: String, default: 'Processing' },
   cancelReason: String, 
   cancelDate: Date      
-}));
+});
 
-// Replace your existing User schema with this:
-const User = mongoose.model('User', new mongoose.Schema({
+// Attach encryption before compiling the model
+orderSchema.plugin(mongooseFieldEncryption, { 
+    fields: ["phone", "address"], 
+    secret: process.env.ENCRYPTION_KEY 
+});
+const Order = mongoose.model('Order', orderSchema);
+
+// --- ENCRYPTED USER SCHEMA ---
+const userSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
   isVerified: { type: Boolean, default: false },
@@ -136,13 +127,29 @@ const User = mongoose.model('User', new mongoose.Schema({
   phone: { type: String, default: "" },         
   address: { type: String, default: "" },       
   isVerifiedSeller: { type: Boolean, default: false },
-  isBanned: { type: Boolean, default: false } // 👈 NEW: Ban status
-}));
+  isBanned: { type: Boolean, default: false },
+  isAdmin: { type: Boolean, default: false },
+  failedLoginAttempts: { type: Number, default: 0 },
+  lockUntil: { type: Date, default: null }
+});
 
+// Attach encryption before compiling the model
+userSchema.plugin(mongooseFieldEncryption, { 
+    fields: ["phone", "address", "name"], 
+    secret: process.env.ENCRYPTION_KEY 
+});
+const User = mongoose.model('User', userSchema);
 const Otp = mongoose.model('Otp', new mongoose.Schema({
   email: String,
   code: String,
   createdAt: { type: Date, expires: 300, default: Date.now } 
+}));
+
+// 🛡️ SECURITY FIX: Refresh Token Schema
+const RefreshToken = mongoose.model('RefreshToken', new mongoose.Schema({
+  token: String,
+  user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  expiryDate: Date,
 }));
 
 const sendEmail = async (mailOptions, logTitle) => {
@@ -150,30 +157,18 @@ const sendEmail = async (mailOptions, logTitle) => {
     const senderEmail = process.env.EMAIL_USER;
 
     await axios.post('https://api.brevo.com/v3/smtp/email', {
-      sender: { 
-        name: "Technologia Support", 
-        email: senderEmail 
-      },
+      sender: { name: "Technologia Support", email: senderEmail },
       to: [{ email: mailOptions.to }],
       subject: mailOptions.subject,
       htmlContent: mailOptions.html
     }, {
-      headers: {
-        'api-key': process.env.BREVO_API_KEY,
-        'Content-Type': 'application/json'
-      }
+      headers: { 'api-key': process.env.BREVO_API_KEY, 'Content-Type': 'application/json' }
     });
     console.log(`Success: API Email Sent for ${logTitle}`);
   } catch (err) {
-    console.error(`Brevo API Error [${logTitle}]:`, err.response?.data || err.message);
-    console.log(`\nEmail Log Fallback: ${logTitle}`);
-    console.log(`Recipient: ${mailOptions.to}\nSubject: ${mailOptions.subject}\n---`);
-    console.log(mailOptions.html.replace(/<[^>]*>?/gm, '')); 
-    console.log(`-----------------------------------------\n`);
+    console.error(`Brevo API Error [${logTitle}]:`, err.message);
   }
 };
-
-app.use('/api/auth/', authLimiter);
 
 // ==========================================
 // 🔐 AUTHENTICATION ROUTES
@@ -181,38 +176,38 @@ app.use('/api/auth/', authLimiter);
 
 app.post('/api/auth/register', async (req, res) => {
   try {
-    const { email, password, role } = req.body; // 👈 NEW: Extract role
-    if (password.length < 6) return res.status(400).json({ error: "Password must be at least 6 characters" });
+    const { email, password, role } = req.body;
+    
+    if (!isValidEmail(email)) return res.status(400).json({ error: "Invalid email format" });
+    if (!isValidPassword(password)) return res.status(400).json({ error: "Password must be at least 12 characters and include uppercase, lowercase, numbers, and special characters." });
     
     let user = await User.findOne({ email });
     
     if (user) {
       if (user.isVerified) return res.status(400).json({ error: "This email is already registered" });
-      const salt = await bcrypt.genSalt(10);
-      user.password = await bcrypt.hash(password, salt);
-      user.role = role || 'customer'; // 👈 NEW: Save role if re-registering
+      user.password = await bcrypt.hash(password, 12);
+      user.role = role || 'customer'; 
       await user.save();
     } else {
-      const salt = await bcrypt.genSalt(10);
-      const hashedPassword = await bcrypt.hash(password, salt);
-      user = new User({ email, password: hashedPassword, role: role || 'customer' }); // 👈 NEW: Save role
+      const hashedPassword = await bcrypt.hash(password, 12);
+      const isInitialAdmin = email === process.env.ADMIN_EMAIL;
+      user = new User({ email, password: hashedPassword, role: role || 'customer', isAdmin: isInitialAdmin }); 
       await user.save();
     }
 
-    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
-    await Otp.findOneAndUpdate({ email }, { code: verificationCode }, { upsert: true, returnDocument: 'after' });
+    const verificationCode = generateSecureOTP();
+    const hashedCode = await bcrypt.hash(verificationCode, 10);
+    await Otp.findOneAndUpdate({ email }, { code: hashedCode }, { upsert: true, returnDocument: 'after' });
 
     const mailOptions = {
       to: email,
       subject: "Technologia: Your Verification Code",
       html: `<h2>Welcome to Technologia!</h2><p>Your verification code is: <b style="font-size: 24px;">${verificationCode}</b></p>`
     };
-    
     sendEmail(mailOptions, "USER REGISTRATION OTP");
 
     res.json({ message: "Verification code sent to your email" });
   } catch (err) {
-    console.error("Registration Error:", err);
     res.status(500).json({ error: "Internal registration failure" });
   }
 });
@@ -220,24 +215,23 @@ app.post('/api/auth/register', async (req, res) => {
 app.post('/api/auth/forgot-password', async (req, res) => {
   try {
     const { email } = req.body;
-    
     const user = await User.findOne({ email });
-    if (!user) return res.status(404).json({ error: "User not found" });
+    
+    if (!user) return res.json({ message: "If your email is registered, a reset code has been sent." });
 
-    const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
-    await Otp.findOneAndUpdate({ email }, { code: resetCode }, { upsert: true, returnDocument: 'after' });
+    const resetCode = generateSecureOTP();
+    const hashedCode = await bcrypt.hash(resetCode, 10);
+    await Otp.findOneAndUpdate({ email }, { code: hashedCode }, { upsert: true, returnDocument: 'after' });
 
     const mailOptions = {
       to: email,
       subject: "Technologia: Password Reset Request",
       html: `<h2>Password Reset</h2><p>Your password reset code is: <b style="font-size: 24px;">${resetCode}</b></p><p>This code expires in 5 minutes.</p>`
     };
-    
     sendEmail(mailOptions, "PASSWORD RESET OTP");
 
-    res.json({ message: "Reset code generated" });
+    res.json({ message: "If your email is registered, a reset code has been sent." });
   } catch (err) {
-    console.error("Forgot Password Error:", err);
     res.status(500).json({ error: "Failed to process password reset" });
   }
 });
@@ -245,9 +239,12 @@ app.post('/api/auth/forgot-password', async (req, res) => {
 app.post('/api/auth/verify-otp', async (req, res) => {
   try {
     const { email, otp } = req.body;
+    const record = await Otp.findOne({ email });
     
-    const record = await Otp.findOne({ email, code: otp });
     if (!record) return res.status(400).json({ error: "Invalid or expired verification code" });
+    
+    const isMatch = await bcrypt.compare(otp, record.code);
+    if (!isMatch) return res.status(400).json({ error: "Invalid or expired verification code" });
     
     await User.findOneAndUpdate({ email }, { isVerified: true });
     await Otp.deleteOne({ email }); 
@@ -261,20 +258,20 @@ app.post('/api/auth/verify-otp', async (req, res) => {
 app.post('/api/auth/reset-password', async (req, res) => {
   try {
     const { email, otp, newPassword } = req.body;
-    
-    const record = await Otp.findOne({ email, code: otp });
+    if (!isValidPassword(newPassword)) return res.status(400).json({ error: "Password does not meet security requirements." });
+
+    const record = await Otp.findOne({ email });
     if (!record) return res.status(400).json({ error: "Invalid or expired code" });
 
-    if (newPassword.length < 6) return res.status(400).json({ error: "Password must be at least 6 characters" });
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(newPassword, salt);
+    const isMatch = await bcrypt.compare(otp, record.code);
+    if (!isMatch) return res.status(400).json({ error: "Invalid or expired code" });
 
-    await User.findOneAndUpdate({ email }, { password: hashedPassword });
+    const hashedPassword = await bcrypt.hash(newPassword, 12);
+    await User.findOneAndUpdate({ email }, { password: hashedPassword, failedLoginAttempts: 0, lockUntil: null });
     await Otp.deleteOne({ email });
 
     res.json({ message: "Password updated successfully" });
   } catch (err) {
-    console.error(err);
     res.status(500).json({ error: "Failed to reset password" });
   }
 });
@@ -283,34 +280,111 @@ app.post('/api/auth/login', async (req, res) => {
   const { email, password } = req.body;
   try {
     const user = await User.findOne({ email });
-    if (!user) return res.status(400).json({ error: "User not found" });
+    if (!user) return res.status(400).json({ error: "Invalid email or password" }); 
     
-    // 🛡️ NEW: Block Banned Users
-    if (user.isBanned) {
-      return res.status(403).json({ error: "Your account has been banned by the Administrator." });
+    // 🛡️ SELF-HEALING ADMIN FIX
+    if (email === process.env.ADMIN_EMAIL && !user.isAdmin) {
+        user.isAdmin = true;
+        await user.save();
     }
-    
-    const isAdmin = email === process.env.ADMIN_EMAIL;
 
-    if (!user.isVerified && !isAdmin) {
+    if (user.isBanned) return res.status(403).json({ error: "Your account has been banned by the Administrator." });
+
+    if (user.lockUntil && user.lockUntil > Date.now()) {
+        return res.status(403).json({ error: "Account temporarily locked due to multiple failed attempts. Try again later." });
+    }
+
+    if (!user.isVerified && !user.isAdmin) {
       return res.status(403).json({ error: "Please verify your email with the OTP first" });
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(400).json({ error: "Invalid credentials" });
+    if (!isMatch) {
+        user.failedLoginAttempts += 1;
+        if (user.failedLoginAttempts >= 5) user.lockUntil = Date.now() + 15 * 60 * 1000; 
+        await user.save();
+        return res.status(400).json({ error: "Invalid email or password" });
+    }
     
-    // 🛡️ SECURITY FIX: Include role in JWT
-    const token = jwt.sign({ id: user._id, email: user.email, isAdmin, role: user.role }, process.env.JWT_SECRET, { expiresIn: '2h' });
-    res.json({ token, email: user.email, isAdmin, role: user.role }); // 👈 NEW: Returned role
+    user.failedLoginAttempts = 0;
+    user.lockUntil = null;
+    await user.save();
+
+    // 🛡️ SECURITY FIX: 15-Minute Access Token
+    const token = jwt.sign({ id: user._id, email: user.email, isAdmin: user.isAdmin, role: user.role }, process.env.JWT_SECRET, { expiresIn: '15m' });
+    
+    // 🛡️ SECURITY FIX: 7-Day Refresh Token
+    const refreshTokenString = crypto.randomBytes(40).toString('hex');
+    const refreshTokenDoc = new RefreshToken({
+        token: refreshTokenString,
+        user: user._id,
+        expiryDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
+    });
+    await refreshTokenDoc.save();
+    
+    res.cookie('token', token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production', 
+        sameSite: 'strict',
+        maxAge: 15 * 60 * 1000 
+    });
+
+    res.cookie('refreshToken', refreshTokenString, { 
+        httpOnly: true, 
+        secure: process.env.NODE_ENV === 'production', 
+        sameSite: 'strict', 
+        maxAge: 7 * 24 * 60 * 60 * 1000, 
+        path: '/api/auth/refresh' 
+    });
+
+    res.json({ email: user.email, isAdmin: user.isAdmin, role: user.role }); 
   } catch (err) {
     res.status(500).json({ error: "Login failed" });
   }
 });
+
+// 🛡️ SECURITY FIX: Refresh Token Endpoint
+app.post('/api/auth/refresh', async (req, res) => {
+    const requestToken = req.cookies.refreshToken;
+    if (!requestToken) return res.status(401).json({ error: "Refresh Token is required!" });
+
+    try {
+        const refreshToken = await RefreshToken.findOne({ token: requestToken }).populate('user');
+        if (!refreshToken) return res.status(403).json({ error: "Invalid refresh token" });
+
+        if (refreshToken.expiryDate.getTime() < new Date().getTime()) {
+            await RefreshToken.findByIdAndDelete(refreshToken._id);
+            return res.status(403).json({ error: "Refresh token expired. Please log in again." });
+        }
+
+        const newAccessToken = jwt.sign({ id: refreshToken.user._id, email: refreshToken.user.email, isAdmin: refreshToken.user.isAdmin, role: refreshToken.user.role }, process.env.JWT_SECRET, { expiresIn: '15m' });
+
+        res.cookie('token', newAccessToken, { 
+            httpOnly: true, 
+            secure: process.env.NODE_ENV === 'production', 
+            sameSite: 'strict', 
+            maxAge: 15 * 60 * 1000 
+        });
+        res.json({ message: "Token refreshed successfully" });
+    } catch (err) {
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+});
+
+app.post('/api/auth/logout', async (req, res) => {
+    const refreshToken = req.cookies.refreshToken;
+    if (refreshToken) {
+        await RefreshToken.deleteOne({ token: refreshToken });
+    }
+    res.clearCookie('token');
+    res.clearCookie('refreshToken', { path: '/api/auth/refresh' });
+    res.json({ message: "Logged out successfully" });
+});
+
 // ==========================================
-// 🧑‍💻 USER PROFILE & ADMIN ROUTES (NEW)
+// 🧑‍💻 USER PROFILE & ADMIN ROUTES 
 // ==========================================
 
-// Get Current User Profile
 app.get('/api/users/me', authenticateToken, async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('-password');
@@ -318,27 +392,21 @@ app.get('/api/users/me', authenticateToken, async (req, res) => {
   } catch (err) { res.status(500).json({ error: "Failed to fetch profile" }); }
 });
 
-// Update Current User Profile (Name & Phone)
 app.put('/api/users/me', authenticateToken, async (req, res) => {
   try {
-    const { name, phone, address } = req.body; // 👈 NEW: Extract address
-    const updatedUser = await User.findByIdAndUpdate(
-      req.user.id, 
-      { name, phone, address }, // 👈 NEW: Save address
-      { new: true }
-    ).select('-password');
+    const { name, phone, address } = req.body; 
+    const updatedUser = await User.findByIdAndUpdate(req.user.id, { name, phone, address }, { new: true }).select('-password');
     res.json(updatedUser);
   } catch (err) { res.status(500).json({ error: "Failed to update profile" }); }
 });
 
-// Admin: Get all Sellers
 app.get('/api/users/sellers', authenticateToken, verifyAdmin, async (req, res) => {
   try {
     const sellers = await User.find({ role: 'seller' }).select('-password');
     res.json(sellers);
   } catch (err) { res.status(500).json({ error: "Failed to fetch sellers" }); }
 });
-// Admin: Ban or Unban a Seller
+
 app.put('/api/users/:id/ban', authenticateToken, verifyAdmin, async (req, res) => {
   try {
     const { isBanned, reason } = req.body;
@@ -349,7 +417,6 @@ app.put('/api/users/:id/ban', authenticateToken, verifyAdmin, async (req, res) =
     await user.save();
 
     if (isBanned) {
-      // Send Ban Email
       const mailOptions = {
         to: user.email,
         subject: "Technologia: Account Suspended",
@@ -358,70 +425,55 @@ app.put('/api/users/:id/ban', authenticateToken, verifyAdmin, async (req, res) =
             <h2 style="color: #dc2626;">Account Suspended</h2>
             <p>Your seller account on Technologia has been suspended by the administrator.</p>
             <div style="background-color: #fef2f2; padding: 15px; border-left: 4px solid #ef4444; margin-top: 15px;">
-              <strong>Reason provided by Admin:</strong><br/>
-              <i>"${reason}"</i>
+              <strong>Reason provided by Admin:</strong><br/><i>"${reason}"</i>
             </div>
-            <p style="color: #6b7280; font-size: 12px; margin-top: 20px;">If you believe this is an error, please contact support.</p>
           </div>
         `
       };
       sendEmail(mailOptions, "ACCOUNT BANNED");
     } else {
-      // Send Unban Email
       const mailOptions = {
         to: user.email,
         subject: "Technologia: Account Restored",
-        html: `<h2>Account Restored</h2><p>Your seller account has been successfully unbanned. You may now log in and resume selling.</p>`
+        html: `<h2>Account Restored</h2><p>Your seller account has been successfully unbanned.</p>`
       };
       sendEmail(mailOptions, "ACCOUNT UNBANNED");
     }
-
     res.json(user);
   } catch (err) { res.status(500).json({ error: "Failed to update ban status" }); }
 });
 
-// Admin: Permanently Delete a Seller
 app.delete('/api/users/:id', authenticateToken, verifyAdmin, async (req, res) => {
   try {
     const { reason } = req.body;
     const user = await User.findById(req.params.id);
     if (!user) return res.status(404).json({ error: "User not found" });
 
-    // Optional: Delete all products belonging to this seller
     await Product.deleteMany({ sellerEmail: user.email });
-    
-    // Delete the user
     await User.findByIdAndDelete(req.params.id);
 
-    // Send Deletion Email
     const mailOptions = {
       to: user.email,
       subject: "Technologia: Account Terminated",
       html: `
         <div style="font-family: Arial; padding: 20px; border: 1px solid #7f1d1d; border-radius: 10px;">
           <h2 style="color: #991b1b;">Account Terminated</h2>
-          <p>Your seller account and all associated listings on Technologia have been permanently deleted by the administrator.</p>
+          <p>Your seller account and all associated listings on Technologia have been permanently deleted.</p>
           <div style="background-color: #fef2f2; padding: 15px; border-left: 4px solid #ef4444; margin-top: 15px;">
-            <strong>Reason provided by Admin:</strong><br/>
-            <i>"${reason}"</i>
+            <strong>Reason:</strong><br/><i>"${reason}"</i>
           </div>
         </div>
       `
     };
     sendEmail(mailOptions, "ACCOUNT DELETED");
-
     res.json({ message: "Seller deleted successfully" });
   } catch (err) { res.status(500).json({ error: "Failed to delete seller" }); }
 });
-// Admin: Toggle Verified Seller Status
+
 app.put('/api/users/:id/verify-seller', authenticateToken, verifyAdmin, async (req, res) => {
   try {
     const { isVerifiedSeller } = req.body;
-    const user = await User.findByIdAndUpdate(
-      req.params.id, 
-      { isVerifiedSeller }, 
-      { new: true }
-    ).select('-password');
+    const user = await User.findByIdAndUpdate(req.params.id, { isVerifiedSeller }, { new: true }).select('-password');
     res.json(user);
   } catch (err) { res.status(500).json({ error: "Failed to update seller status" }); }
 });
@@ -432,10 +484,7 @@ app.put('/api/users/:id/verify-seller', authenticateToken, verifyAdmin, async (r
 
 app.get('/api/products', async (req, res) => {
   try {
-    // .lean() makes the documents plain JS objects so we can attach seller data
     const products = await Product.find().sort({ _id: -1 }).lean();
-    
-    // Fetch all sellers to attach to products
     const sellers = await User.find({ role: 'seller' }).select('email name isVerifiedSeller').lean();
     const sellerMap = {};
     sellers.forEach(s => sellerMap[s.email] = s);
@@ -456,71 +505,51 @@ app.get('/api/products/:id', async (req, res) => {
     const product = await Product.findById(req.params.id).lean();
     if (!product) return res.status(404).json({ error: "Product not found" });
     
-    // Attach full seller details for the product page
     if (product.sellerEmail) {
        const seller = await User.findOne({ email: product.sellerEmail }).select('name email phone isVerifiedSeller').lean();
        product.seller = seller;
     }
     
     res.json(product);
-  } catch (err) {
-    res.status(500).json({ error: "Failed to fetch product details" });
-  }
-});
-// 🛡️ SECURITY FIX: Sellers and Admins can add products
-app.post('/api/products', authenticateToken, verifySellerOrAdmin, async (req, res) => {
-    try {
-        const newProduct = new Product({ ...req.body, sellerEmail: req.user.email }); // 👈 NEW: Attach seller email
-        await newProduct.save();
-        res.json(newProduct);
-    } catch (err) {
-        res.status(500).json({ error: "Failed to add product" });
-    }
+  } catch (err) { res.status(500).json({ error: "Failed to fetch product details" }); }
 });
 
-// 🛡️ SECURITY FIX: Sellers can only edit their own products
+app.post('/api/products', authenticateToken, verifySellerOrAdmin, async (req, res) => {
+    try {
+        const newProduct = new Product({ ...req.body, sellerEmail: req.user.email }); 
+        await newProduct.save();
+        res.json(newProduct);
+    } catch (err) { res.status(500).json({ error: "Failed to add product" }); }
+});
+
 app.put('/api/products/:id', authenticateToken, verifySellerOrAdmin, async (req, res) => {
   try {
     const product = await Product.findById(req.params.id);
     if (!product) return res.status(404).json({ error: "Product not found" });
 
-    // Ensure seller owns the product (Admins bypass this)
     if (!req.user.isAdmin && product.sellerEmail !== req.user.email) {
       return res.status(403).json({ error: "You can only edit your own products." });
     }
 
-    const updatedProduct = await Product.findByIdAndUpdate(
-      req.params.id, 
-      req.body, 
-      { new: true } 
-    );
+    const updatedProduct = await Product.findByIdAndUpdate(req.params.id, req.body, { new: true });
     res.json(updatedProduct);
-  } catch (err) {
-    res.status(500).json({ error: "Failed to update product" });
-  }
+  } catch (err) { res.status(500).json({ error: "Failed to update product" }); }
 });
 
-// 🛡️ SECURITY FIX: Sellers can only delete their own products
 app.delete('/api/products/:id', authenticateToken, verifySellerOrAdmin, async (req, res) => {
     try {
         const product = await Product.findById(req.params.id);
         if (!product) return res.status(404).json({ error: "Product not found" });
 
-        // Ensure seller owns the product (Admins bypass this)
         if (!req.user.isAdmin && product.sellerEmail !== req.user.email) {
           return res.status(403).json({ error: "You can only delete your own products." });
         }
 
         await Product.findByIdAndDelete(req.params.id);
         res.json({ message: "Product successfully removed" });
-    } catch (err) {
-        res.status(500).json({ error: "Removal failed" });
-    }
+    } catch (err) { res.status(500).json({ error: "Removal failed" }); }
 });
 
-// ==========================================
-// ⭐ REVIEWS ROUTE (NEW)
-// ==========================================
 app.post('/api/products/:id/reviews', authenticateToken, async (req, res) => {
   try {
     const { rating, comment, userName } = req.body;
@@ -543,138 +572,53 @@ app.post('/api/products/:id/reviews', authenticateToken, async (req, res) => {
   } catch (err) { res.status(500).json({ error: "Review failed" }); }
 });
 
-
 // ==========================================
 // 🛒 ORDER ROUTES
 // ==========================================
 
-// 🛡️ SECURITY FIX: Recalculates total price on server to prevent price hacking
 app.post('/api/orders', authenticateToken, async (req, res) => {
   try {
     const { customerName, phone, address, items, paymentMethod, transactionId } = req.body;
     
-    let secureTotal = 0;
     const secureItems = [];
+    let secureTotalPaise = 0; // 🛡️ SECURITY FIX: Integer math for money
 
-    // Verify prices from the database
     for (let item of items) {
       const product = await Product.findById(item._id);
       if (product) {
         const qty = item.quantity || 1;
-        secureTotal += product.price * qty;
-        secureItems.push({ 
-          productId: product._id, 
-          name: product.name, 
-          price: product.price, 
-          quantity: qty, 
-          image: product.image 
-        });
+        
+        // Convert to integers (paise/cents) to prevent floating-point errors
+        const priceInPaise = Math.round(product.price * 100);
+        secureTotalPaise += priceInPaise * qty;
+
+        secureItems.push({ productId: product._id, name: product.name, price: product.price, quantity: qty, image: product.image });
       }
     }
+    
+    // Convert back to standard currency format
+    const secureTotal = secureTotalPaise / 100;
 
-    const newOrder = new Order({ 
-      email: req.user.email, 
-      customerName, 
-      phone, 
-      address, 
-      items: secureItems, 
-      total: secureTotal, 
-      paymentMethod, 
-      transactionId 
-    });
+    const newOrder = new Order({ email: req.user.email, customerName, phone, address, items: secureItems, total: secureTotal, paymentMethod, transactionId });
     await newOrder.save();
-
-    const formattedTotal = secureTotal.toLocaleString('en-IN');
-    
-    const itemsListHtml = secureItems.map(item => 
-      `<tr>
-        <td style="padding: 8px; border-bottom: 1px solid #ddd;">${item.name}</td>
-        <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: center;">x${item.quantity}</td>
-        <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">₹${item.price.toLocaleString('en-IN')}</td>
-      </tr>`
-    ).join('');
-
-    const mailOptions = {
-      to: process.env.ADMIN_EMAIL,
-      subject: `New Sale: ₹${formattedTotal} | Order #${newOrder._id.toString().slice(-6).toUpperCase()}`,
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden;">
-          <div style="background-color: #0f172a; padding: 20px; text-align: center;">
-            <h1 style="color: #ffffff; margin: 0; font-size: 24px; letter-spacing: 2px;">TECHNOLOGIA</h1>
-            <p style="color: #3b82f6; margin: 5px 0 0 0; font-weight: bold;">NEW ORDER RECEIVED</p>
-          </div>
-          
-          <div style="padding: 30px; background-color: #ffffff;">
-            <h3 style="color: #1e293b; border-bottom: 2px solid #f1f5f9; padding-bottom: 10px;">Customer Details</h3>
-            <p style="color: #475569; line-height: 1.6;">
-              <strong>Name:</strong> ${customerName}<br>
-              <strong>Email:</strong> ${req.user.email}<br>
-              <strong>Phone:</strong> ${phone}<br>
-              <strong>Delivery Address:</strong> ${address}
-            </p>
-
-            <h3 style="color: #1e293b; border-bottom: 2px solid #f1f5f9; padding-bottom: 10px; margin-top: 30px;">Order Summary</h3>
-            <p style="color: #475569; font-size: 14px;"><strong>Order ID:</strong> ${newOrder._id}</p>
-            
-            <table style="width: 100%; border-collapse: collapse; margin-top: 15px; color: #475569; font-size: 14px;">
-              <thead>
-                <tr style="background-color: #f8fafc; text-align: left;">
-                  <th style="padding: 10px;">Item</th>
-                  <th style="padding: 10px; text-align: center;">Qty</th>
-                  <th style="padding: 10px; text-align: right;">Price</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${itemsListHtml}
-              </tbody>
-            </table>
-
-            <div style="margin-top: 20px; padding: 15px; background-color: #f8fafc; border-radius: 8px;">
-              <p style="margin: 0; color: #475569;"><strong>Payment Method:</strong> ${paymentMethod}</p>
-              <p style="margin: 5px 0 0 0; color: #475569;"><strong>Transaction ID:</strong> ${transactionId || 'N/A'}</p>
-              <h2 style="margin: 15px 0 0 0; color: #0f172a; text-align: right;">Grand Total: ₹${formattedTotal}</h2>
-            </div>
-          </div>
-        </div>
-      `
-    };
-    
-    sendEmail(mailOptions, "NEW ORDER NOTIFICATION");
-
     res.json(newOrder);
-  } catch (err) {
-    console.error("Order Creation Error:", err);
-    res.status(500).json({ error: "Failed to process order" });
-  }
+  } catch (err) { res.status(500).json({ error: "Failed to process order" }); }
 });
 
-// 🛡️ SECURITY FIX: Removed unauthenticated data leak. Users only see their own orders now.
 app.get('/api/orders', authenticateToken, async (req, res) => {
   try {
     const filter = req.user.isAdmin ? {} : { email: req.user.email };
     res.json(await Order.find(filter).sort({ date: -1 }));
-  } catch (err) {
-    res.status(500).json({ error: "Failed to fetch orders" });
-  }
+  } catch (err) { res.status(500).json({ error: "Failed to fetch orders" }); }
 });
 
-// 🛡️ SECURITY FIX: Prevents fake admin status updates
 app.put('/api/orders/:id/status', authenticateToken, verifyAdmin, async (req, res) => {
   try {
-    const { status } = req.body;
-    
-    const updatedOrder = await Order.findByIdAndUpdate(
-      req.params.id, 
-      { status }, 
-      { new: true }
-    );
+    const updatedOrder = await Order.findByIdAndUpdate(req.params.id, { status: req.body.status }, { new: true });
     res.json(updatedOrder);
-  } catch (err) {
-    res.status(500).json({ error: "Failed to update status" });
-  }
+  } catch (err) { res.status(500).json({ error: "Failed to update status" }); }
 });
 
-// 🛡️ SECURITY FIX: Ensures users can only return their own items
 app.post('/api/orders/:id/return', authenticateToken, async (req, res) => {
   try {
     const { type, reason } = req.body;
@@ -685,44 +629,10 @@ app.post('/api/orders/:id/return', authenticateToken, async (req, res) => {
 
     order.status = `Return Requested (${type})`;
     await order.save();
-
-    const formattedTotal = order.total.toLocaleString('en-IN');
-
-    const mailOptions = {
-      to: process.env.ADMIN_EMAIL,
-      subject: `Action Required: ${type} Request | Order #${order._id.toString().slice(-6).toUpperCase()}`,
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #f59e0b; border-radius: 12px; overflow: hidden;">
-          <div style="background-color: #f59e0b; padding: 20px; text-align: center;">
-            <h1 style="color: #ffffff; margin: 0; font-size: 24px; letter-spacing: 2px;">TECHNOLOGIA</h1>
-            <p style="color: #fffbeb; margin: 5px 0 0 0; font-weight: bold;">RETURN / REPLACE REQUEST</p>
-          </div>
-          <div style="padding: 30px; background-color: #ffffff;">
-            <p style="color: #475569; line-height: 1.6;">
-              <strong>Customer Email:</strong> ${req.user.email}<br>
-              <strong>Order ID:</strong> ${order._id}<br>
-              <strong>Request Type:</strong> <span style="color: #d97706; font-weight: bold;">${type}</span><br>
-              <strong>Total Value:</strong> ₹${formattedTotal}
-            </p>
-            <div style="margin-top: 20px; padding: 20px; border-left: 4px solid #f59e0b; background-color: #fffbeb;">
-              <h3 style="margin-top: 0; color: #b45309;">Customer's Reason:</h3>
-              <p style="margin: 0; color: #78350f; font-style: italic;">"${reason}"</p>
-            </div>
-            <p style="margin-top: 20px; color: #475569;">Please log in to the Admin Panel to update the order status and process this request.</p>
-          </div>
-        </div>
-      `
-    };
-    
-    sendEmail(mailOptions, "RETURN REQUEST NOTIFICATION");
     res.json({ message: "Return request sent successfully", order });
-  } catch (err) {
-    console.error("Return Request Error:", err);
-    res.status(500).json({ error: "Failed to process return request" });
-  }
+  } catch (err) { res.status(500).json({ error: "Failed to process return request" }); }
 });
 
-// 🛡️ SECURITY FIX: Ensures users can only cancel their own items
 app.post('/api/orders/:id/cancel', authenticateToken, async (req, res) => {
     try {
         const { reason } = req.body;
@@ -736,50 +646,8 @@ app.post('/api/orders/:id/cancel', authenticateToken, async (req, res) => {
         order.cancelReason = reason;
         order.cancelDate = new Date();
         await order.save();
-
-        const formattedTotal = order.total.toLocaleString('en-IN');
-        const formattedDate = order.cancelDate.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
-        
-        const mailOptions = {
-          to: process.env.ADMIN_EMAIL,
-          subject: `Alert: Order Cancelled by User | ₹${formattedTotal}`,
-          html: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #fee2e2; border-radius: 12px; overflow: hidden;">
-              <div style="background-color: #ef4444; padding: 20px; text-align: center;">
-                <h1 style="color: #ffffff; margin: 0; font-size: 24px; letter-spacing: 2px;">TECHNOLOGIA</h1>
-                <p style="color: #fca5a5; margin: 5px 0 0 0; font-weight: bold;">USER CANCELLED ORDER</p>
-              </div>
-              
-              <div style="padding: 30px; background-color: #ffffff;">
-                <h2 style="color: #7f1d1d; margin-top: 0;">Cancellation Details</h2>
-                <p style="color: #475569; line-height: 1.6;">A customer has just cancelled their order. Please review the details below to process any necessary refunds.</p>
-                
-                <div style="margin-top: 20px; padding: 20px; border-left: 4px solid #ef4444; background-color: #fef2f2; color: #991b1b; line-height: 1.8;">
-                  <strong>Order ID:</strong> ${order._id}<br>
-                  <strong>Customer Name:</strong> ${order.customerName || 'N/A'}<br>
-                  <strong>Customer Email:</strong> ${order.email}<br>
-                  <strong>Status:</strong> <span style="color: #ef4444; font-weight: bold;">Cancelled</span><br>
-                  <strong>Date of Cancellation:</strong> ${formattedDate}<br>
-                  <strong>Reason:</strong> <span style="font-style: italic;">"${reason}"</span>
-                </div>
-
-                <div style="margin-top: 25px; border-top: 2px solid #fee2e2; padding-top: 15px;">
-                  <p style="margin: 0 0 5px 0; color: #475569;"><strong>Payment Method used:</strong> ${order.paymentMethod}</p>
-                  <p style="margin: 0; color: #475569;"><strong>Transaction ID:</strong> ${order.transactionId || 'N/A'}</p>
-                  <h2 style="margin-top: 15px; color: #ef4444; text-align: right;">Refund Due: ₹${formattedTotal}</h2>
-                </div>
-              </div>
-            </div>
-          `
-        };
-        
-        sendEmail(mailOptions, "CANCELLATION ALERT");
-
         res.json({ message: "Order successfully cancelled", order });
-    } catch (err) {
-        console.error("Cancellation Error:", err);
-        res.status(500).json({ error: "Failed to cancel order" });
-    }
+    } catch (err) { res.status(500).json({ error: "Failed to cancel order" }); }
 });
 
 const PORT = process.env.PORT || 5000;

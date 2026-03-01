@@ -20,7 +20,7 @@ const Navbar = ({ cart, removeFromCart, updateQuantity, isOpen, setIsOpen, clear
   const total = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
   
-  const userEmail = localStorage.getItem('userEmail') || "User";
+  const userEmail = sessionStorage.getItem('userEmail') || "User";
 
   // Fetch all products once for instant local search filtering
   useEffect(() => {
@@ -206,7 +206,7 @@ const Navbar = ({ cart, removeFromCart, updateQuantity, isOpen, setIsOpen, clear
                      </div>
                      
                      {/* 👈 UPDATED: Both Admins AND Sellers can access Inventory Management */}
-                     {(isAdmin || localStorage.getItem('userRole') === 'seller') && (
+                     {(isAdmin || sessionStorage.getItem('userRole') === 'seller') && (
                        <Link onClick={() => setIsProfileDropdownOpen(false)} to="/add" className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition font-bold">
                          Inventory Management
                        </Link>

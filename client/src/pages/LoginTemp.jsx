@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import axios from 'axios';
 import { useNavigate, Link } from 'react-router-dom';
@@ -10,17 +11,18 @@ const LoginTemp = ({ setToken, setIsAdmin, setUserRole }) => {
   const handleLogin = async (e) => {
     e.preventDefault();
     try {
-      const res = await axios.post(`${import.meta.env.VITE_API_URL}/api/auth/login`, { email, password });
+      const res = await axios.post(`/api/auth/login`, { email, password });
       
-      // SAVE EVERYTHING TO STORAGE
-      localStorage.setItem('token', res.data.token);
-      localStorage.setItem('isAdmin', res.data.isAdmin);
-      localStorage.setItem('userEmail', res.data.email); 
-      localStorage.setItem('userRole', res.data.role); // 🚀 NEW: Save Role
+      // 🛡️ SECURITY FIX: Do not store token in storage. Backend handles HTTP-Only cookie.
+      // 🛡️ SECURITY FIX: Use sessionStorage so it clears when browser closes
+      sessionStorage.setItem('isAdmin', res.data.isAdmin);
+      sessionStorage.setItem('userEmail', res.data.email); 
+      sessionStorage.setItem('userRole', res.data.role); 
       
-      setToken(res.data.token);
+      // We set token state to 'true' just so the app knows we are logged in
+      setToken(true); 
       setIsAdmin(res.data.isAdmin);
-      setUserRole(res.data.role); // 🚀 NEW: Update State
+      setUserRole(res.data.role); 
       
       navigate('/');
     } catch (err) {

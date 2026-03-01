@@ -15,9 +15,9 @@ const AddProduct = ({ fetchProducts }) => {
   // 🚀 NEW: Admin Action Modal State
   const [actionModal, setActionModal] = useState({ isOpen: false, type: '', seller: null, reason: '' });
 
-  const token = localStorage.getItem('token');
-  const userEmail = localStorage.getItem('userEmail');
-  const isAdmin = localStorage.getItem('isAdmin') === 'true';
+  const token = sessionStorage.getItem('userEmail') ? true : null;
+  const userEmail = sessionStorage.getItem('userEmail');
+  const isAdmin = sessionStorage.getItem('isAdmin') === 'true';
   const authConfig = { headers: { Authorization: `Bearer ${token}` } };
 
   useEffect(() => { 
