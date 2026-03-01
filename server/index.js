@@ -58,8 +58,8 @@ app.get('/api/csrf-token', (req, res) => {
         token = crypto.randomBytes(32).toString('hex');
         res.cookie('csrfToken', token, {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict'
+            secure: true,
+            sameSite: 'none'
         });
     }
     
@@ -324,15 +324,15 @@ app.post('/api/auth/login', async (req, res) => {
     
     res.cookie('token', token, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production', 
-        sameSite: 'strict',
+        secure: true, 
+        sameSite: 'none',
         maxAge: 15 * 60 * 1000 
     });
 
     res.cookie('refreshToken', refreshTokenString, { 
         httpOnly: true, 
-        secure: process.env.NODE_ENV === 'production', 
-        sameSite: 'strict', 
+        secure: true, 
+        sameSite: 'none', 
         maxAge: 7 * 24 * 60 * 60 * 1000, 
         path: '/api/auth/refresh' 
     });
@@ -361,8 +361,8 @@ app.post('/api/auth/refresh', async (req, res) => {
 
         res.cookie('token', newAccessToken, { 
             httpOnly: true, 
-            secure: process.env.NODE_ENV === 'production', 
-            sameSite: 'strict', 
+            secure: true, 
+            sameSite: 'none', 
             maxAge: 15 * 60 * 1000 
         });
         res.json({ message: "Token refreshed successfully" });
@@ -376,8 +376,10 @@ app.post('/api/auth/logout', async (req, res) => {
     if (refreshToken) {
         await RefreshToken.deleteOne({ token: refreshToken });
     }
-    res.clearCookie('token');
-    res.clearCookie('refreshToken', { path: '/api/auth/refresh' });
+    // 🛡️ Ensure exact matching attributes to clear cross-site cookies
+    res.clearCookie('token', { sameSite: 'none', secure: true });
+    res.clearCookie('refreshToken', { path: '/api/auth/refresh', sameSite: 'none', secure: true });
+    
     res.json({ message: "Logged out successfully" });
 });
 
