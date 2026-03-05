@@ -65,7 +65,8 @@ app.get('/api/csrf-token', (req, res) => {
     
     res.json({ csrfToken: token });
 });
-
+console.log("Encryption Key Length:", process.env.ENCRYPTION_KEY ? process.env.ENCRYPTION_KEY.length : "MISSING");
+console.log("Starts with quote?", process.env.ENCRYPTION_KEY?.startsWith('"'));
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log("Shielded DB Connected Successfully"))
   .catch(err => console.error("Database Connection Error:", err));
