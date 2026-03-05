@@ -487,7 +487,10 @@ app.put('/api/users/:id/verify-seller', authenticateToken, verifyAdmin, async (r
 app.get('/api/products', async (req, res) => {
   try {
     const products = await Product.find().sort({ _id: -1 }).lean();
-    const sellers = await User.find({ role: 'seller' }).select('email name isVerifiedSeller').lean();
+    
+    // REMOVED .lean() FROM HERE
+    const sellers = await User.find({ role: 'seller' }).select('email name isVerifiedSeller');
+    
     const sellerMap = {};
     sellers.forEach(s => sellerMap[s.email] = s);
 
@@ -509,7 +512,8 @@ app.get('/api/products/:id', async (req, res) => {
     
     if (product.sellerEmail) {
        // 🛡️ PRIVACY FIX: Only expose the seller's public-facing info
-const seller = await User.findOne({ email: product.sellerEmail }).select('name email isVerifiedSeller').lean();
+       // REMOVED .lean() FROM HERE
+       const seller = await User.findOne({ email: product.sellerEmail }).select('name email isVerifiedSeller');
        product.seller = seller;
     }
     
