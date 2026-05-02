@@ -3,26 +3,26 @@ import axios from 'axios';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import CheckoutModal from './CheckoutModal';
+import { useAuth } from '../context/AuthContext'; // 🚀 IMPORT CONTEXT
 
-const Navbar = ({ cart, removeFromCart, updateQuantity, isOpen, setIsOpen, clearCart, searchTerm, setSearchTerm, token, isAdmin, logout }) => {
+const Navbar = ({ cart, removeFromCart, updateQuantity, isOpen, setIsOpen, clearCart, searchTerm, setSearchTerm }) => {
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
   
-  // 🚀 NEW: Search State
   const [allProducts, setAllProducts] = useState([]);
   const [searchResults, setSearchResults] = useState([]);
   const [isSearchDropdownOpen, setIsSearchDropdownOpen] = useState(false);
   
   const navigate = useNavigate();
   const dropdownRef = useRef(null); 
-  const searchRef = useRef(null); // 🚀 NEW: Ref for search bar
+  const searchRef = useRef(null); 
+  
+  // 🚀 PULL FROM CONTEXT
+  const { isAuthenticated, userEmail, isAdmin, userRole, logout } = useAuth();
   
   const total = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
-  
-  const userEmail = sessionStorage.getItem('userEmail') || "User";
 
-  // Fetch all products once for instant local search filtering
   useEffect(() => {
     const fetchProducts = async () => {
       try {
@@ -35,7 +35,6 @@ const Navbar = ({ cart, removeFromCart, updateQuantity, isOpen, setIsOpen, clear
     fetchProducts();
   }, []);
 
-  // Event listener to close dropdowns when clicking anywhere else on the screen
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -47,21 +46,18 @@ const Navbar = ({ cart, removeFromCart, updateQuantity, isOpen, setIsOpen, clear
     };
 
     document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // 🚀 NEW: Handle Search Input
   const handleSearchChange = (e) => {
     const value = e.target.value;
-    setSearchTerm(value); // Keep your existing page filter working
+    setSearchTerm(value);
 
     if (value.trim().length > 0) {
       const filtered = allProducts.filter(product => 
         product.name.toLowerCase().includes(value.toLowerCase()) || 
         product.category?.toLowerCase().includes(value.toLowerCase())
-      ).slice(0, 5); // Limit to top 5 results
+      ).slice(0, 5); 
       
       setSearchResults(filtered);
       setIsSearchDropdownOpen(true);
@@ -71,25 +67,20 @@ const Navbar = ({ cart, removeFromCart, updateQuantity, isOpen, setIsOpen, clear
     }
   };
 
-  // 🚀 NEW: Handle Clicking a Search Result
   const handleSelectProduct = (productId) => {
     setIsSearchDropdownOpen(false);
-    setSearchTerm(''); // Clear the search bar
-    navigate(`/product/${productId}`); // Adjust this path if your product details page has a different route
+    setSearchTerm(''); 
+    navigate(`/product/${productId}`); 
   };
 
   const handleCheckoutSubmit = async (orderData) => {
     try {
-      const token = localStorage.getItem('token');
-      await axios.post(`${import.meta.env.VITE_API_URL}/api/orders`, 
-        orderData, 
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      // 🚀 NO MANUAL HEADERS REQUIRED
+      await axios.post(`${import.meta.env.VITE_API_URL}/api/orders`, orderData);
     } catch (err) { 
-      // 🚀 NEW: Check if the error is a 403 (Forbidden / Expired Token)
       if (err.response && err.response.status === 403) {
         alert("Your session has expired. Please log in again to complete your order.");
-        logout(); // Automatically logs them out and redirects to home
+        logout(); 
       } else {
         alert("Failed to place order. Please try again.");
       }
@@ -104,7 +95,7 @@ const Navbar = ({ cart, removeFromCart, updateQuantity, isOpen, setIsOpen, clear
   };
 
   const initiateCheckout = () => {
-    if (!token) {
+    if (!isAuthenticated) {
       alert("Please log in or sign up to place an order.");
       setIsOpen(false);
       navigate('/login'); 
@@ -122,7 +113,6 @@ const Navbar = ({ cart, removeFromCart, updateQuantity, isOpen, setIsOpen, clear
             TECHNOLOGIA
           </Link>
           
-          {/* --- SEARCH BAR SECTION --- */}
           <div className="relative w-full md:w-1/3" ref={searchRef}>
             <div className="relative">
               <svg className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -138,7 +128,6 @@ const Navbar = ({ cart, removeFromCart, updateQuantity, isOpen, setIsOpen, clear
               />
             </div>
 
-            {/* LIVE DROPDOWN RESULTS */}
             <AnimatePresence>
               {isSearchDropdownOpen && searchResults.length > 0 && (
                 <motion.div 
@@ -165,7 +154,6 @@ const Navbar = ({ cart, removeFromCart, updateQuantity, isOpen, setIsOpen, clear
                 </motion.div>
               )}
 
-              {/* NO RESULTS STATE */}
               {isSearchDropdownOpen && searchTerm.trim().length > 0 && searchResults.length === 0 && (
                 <motion.div 
                   initial={{ opacity: 0, y: 10 }}
@@ -181,8 +169,7 @@ const Navbar = ({ cart, removeFromCart, updateQuantity, isOpen, setIsOpen, clear
 
           <div className="flex items-center gap-4 md:gap-6">
             
-            {/* --- USER PROFILE / LOGIN SECTION --- */}
-            {token ? (
+            {isAuthenticated ? (
               <div className="relative" ref={dropdownRef}>
                 <button 
                   onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
@@ -190,7 +177,7 @@ const Navbar = ({ cart, removeFromCart, updateQuantity, isOpen, setIsOpen, clear
                 >
                   <div className="w-10 h-10 rounded-full bg-emerald-500
                   flex items-center justify-center text-sm font-bold shadow-md text-white">
-                    {userEmail.charAt(0).toUpperCase()}
+                    {userEmail?.charAt(0).toUpperCase() || 'U'}
                   </div>
                   <div className="text-left hidden md:block">
                     <p className="text-xs text-gray-500">Signed in as</p>
@@ -205,8 +192,7 @@ const Navbar = ({ cart, removeFromCart, updateQuantity, isOpen, setIsOpen, clear
                         <p className="text-sm font-bold text-gray-900 truncate">{userEmail}</p>
                      </div>
                      
-                     {/* 👈 UPDATED: Both Admins AND Sellers can access Inventory Management */}
-                     {(isAdmin || sessionStorage.getItem('userRole') === 'seller') && (
+                     {(isAdmin || userRole === 'seller') && (
                        <Link onClick={() => setIsProfileDropdownOpen(false)} to="/add" className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition font-bold">
                          Inventory Management
                        </Link>
@@ -227,7 +213,6 @@ const Navbar = ({ cart, removeFromCart, updateQuantity, isOpen, setIsOpen, clear
               </div>
             )}
 
-            {/* --- ICONS SECTION (Wishlist & Cart) --- */}
             <div className="flex items-center gap-2 border-l border-gray-200 pl-4 md:pl-6">
               <Link to="/wishlist" title="Wishlist" className="relative p-2 hover:bg-gray-100 rounded-full transition-all flex items-center justify-center">
                 <span className="text-2xl">❤️</span>
@@ -247,7 +232,6 @@ const Navbar = ({ cart, removeFromCart, updateQuantity, isOpen, setIsOpen, clear
         </div>
       </nav>
 
-      {/* --- CART SIDEBAR --- */}
       {isOpen && <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm z-40" onClick={() => setIsOpen(false)}></div>}
       
       <div className={`fixed top-0 right-0 h-full w-85 md:w-96 bg-gray-50 text-gray-900 shadow-2xl z-50 transform transition-transform duration-300 ease-in-out flex flex-col border-l border-gray-200 ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}>
@@ -284,7 +268,6 @@ const Navbar = ({ cart, removeFromCart, updateQuantity, isOpen, setIsOpen, clear
         )}
       </div>
 
-      {/* --- CHECKOUT MODAL --- */}
       <CheckoutModal 
         isOpen={isCheckoutOpen} 
         onClose={() => setIsCheckoutOpen(false)} 

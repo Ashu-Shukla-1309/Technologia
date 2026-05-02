@@ -3,33 +3,26 @@ import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
+import { useAuth } from '../context/AuthContext'; // 🚀 IMPORT CONTEXT
 
 const Orders = () => {
   const [orders, setOrders] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Return Modal State
   const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
   const [returnOrderDetails, setReturnOrderDetails] = useState(null);
   const [returnForm, setReturnForm] = useState({ type: 'Refund', reason: '' });
 
-  // Cancel Modal State
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [cancelOrderDetails, setCancelOrderDetails] = useState(null);
   const [cancelReason, setCancelReason] = useState('');
 
-  // 🚀 NEW: Review Modal State
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [reviewItem, setReviewItem] = useState(null);
   const [reviewForm, setReviewForm] = useState({ rating: 5, comment: '', userName: '' });
 
-  const userEmail = localStorage.getItem('userEmail');
-  const isAdmin = localStorage.getItem('isAdmin') === 'true';
-
-  // 🛡️ SECURITY: Get token and set auth headers for all API calls
-  const token = localStorage.getItem('token');
-  const authHeaders = { headers: { Authorization: `Bearer ${token}` } };
+  const { isAdmin, userEmail } = useAuth(); // 🚀 PULL FROM CONTEXT
 
   useEffect(() => {
     fetchOrders();
@@ -38,7 +31,8 @@ const Orders = () => {
   const fetchOrders = async () => {
     setIsLoading(true);
     try {
-      const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/orders`, authHeaders);
+      // 🚀 NO MANUAL HEADERS
+      const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/orders`);
       setOrders(res.data);
     } catch (err) {
       toast.error("Failed to load orders");
@@ -50,9 +44,10 @@ const Orders = () => {
   const handleStatusUpdate = async (orderId, newStatus) => {
     const loadingToast = toast.loading("Updating status...");
     try {
+      // 🚀 NO MANUAL HEADERS
       await axios.put(`${import.meta.env.VITE_API_URL}/api/orders/${orderId}/status`, { 
         status: newStatus 
-      }, authHeaders);
+      });
       toast.success("Order status updated!", { id: loadingToast });
       fetchOrders(); 
     } catch (err) {
@@ -71,10 +66,11 @@ const Orders = () => {
     if (!returnForm.reason.trim()) return toast.error("Please provide a reason.");
     const loadingToast = toast.loading("Sending request to admin...");
     try {
+      // 🚀 NO MANUAL HEADERS
       await axios.post(`${import.meta.env.VITE_API_URL}/api/orders/${returnOrderDetails._id}/return`, {
         type: returnForm.type,
         reason: returnForm.reason
-      }, authHeaders);
+      });
       
       toast.success("Request sent! Our team will contact you shortly.", { id: loadingToast });
       setIsReturnModalOpen(false);
@@ -95,9 +91,10 @@ const Orders = () => {
     if (!cancelReason.trim()) return toast.error("Please provide a reason for cancellation.");
     const loadingToast = toast.loading("Cancelling order...");
     try {
+      // 🚀 NO MANUAL HEADERS
       await axios.post(`${import.meta.env.VITE_API_URL}/api/orders/${cancelOrderDetails._id}/cancel`, {
         reason: cancelReason
-      }, authHeaders);
+      });
       
       toast.success("Order cancelled successfully.", { id: loadingToast });
       setIsCancelModalOpen(false);
@@ -107,16 +104,13 @@ const Orders = () => {
     }
   };
 
-  // 🚀 NEW: Open Review Modal
   const openReviewModal = (item) => {
     setReviewItem(item);
-    // Auto-fill username based on email prefix if available
     const defaultName = userEmail ? userEmail.split('@')[0] : 'Customer';
     setReviewForm({ rating: 5, comment: '', userName: defaultName });
     setIsReviewModalOpen(true);
   };
 
-  // 🚀 NEW: Submit Review Function
   const handleReviewSubmit = async (e) => {
     e.preventDefault();
     if (!reviewForm.comment.trim()) return toast.error("Please provide a review comment.");
@@ -124,9 +118,9 @@ const Orders = () => {
     
     const loadingToast = toast.loading("Submitting review...");
     try {
-      // Backend expects: rating, comment, userName
       const productId = reviewItem.productId || reviewItem._id;
-      await axios.post(`${import.meta.env.VITE_API_URL}/api/products/${productId}/reviews`, reviewForm, authHeaders);
+      // 🚀 NO MANUAL HEADERS
+      await axios.post(`${import.meta.env.VITE_API_URL}/api/products/${productId}/reviews`, reviewForm);
       
       toast.success("Review submitted successfully! Thank you.", { id: loadingToast });
       setIsReviewModalOpen(false);
@@ -155,7 +149,6 @@ const Orders = () => {
     <div className="min-h-screen bg-slate-50 py-24 px-6 font-sans">
       <div className="container mx-auto max-w-5xl">
         
-        {/* Header & Search Bar Section */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-12 border-b border-slate-200 pb-6 gap-4">
           <div>
             <h1 className="text-4xl font-black text-gray-900 tracking-tight">
@@ -166,7 +159,6 @@ const Orders = () => {
             </p>
           </div>
           
-          {/* Order Search Bar */}
           {!isLoading && orders.length > 0 && (
             <div className="relative w-full md:w-80">
               <svg className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -208,7 +200,6 @@ const Orders = () => {
               {filteredOrders.map((order) => (
                 <motion.div key={order._id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-white p-6 md:p-8 rounded-[2rem] shadow-sm border border-gray-100 flex flex-col gap-6">
                   
-                  {/* Order Header */}
                   <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-gray-100 pb-6">
                     <div>
                       <p className="text-xs text-gray-400 font-bold uppercase tracking-wider mb-1">Order #{order._id}</p>
@@ -241,15 +232,13 @@ const Orders = () => {
                     </div>
                   </div>
 
-                  {/* Order Items */}
                   <div className="grid grid-cols-1 gap-4">
                     {order.items.map((item, index) => {
-                      const itemProductId = item.productId || item._id; // Fallback for robust routing
+                      const itemProductId = item.productId || item._id; 
                       
                       return (
                       <div key={index} className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-gray-50 p-4 rounded-2xl border border-gray-100">
                         
-                        {/* 🚀 NEW: Image and Title are now clickable links */}
                         <div className="flex items-center gap-4">
                           <Link to={`/product/${itemProductId}`}>
                             <img src={item.image} alt={item.name} className="w-16 h-16 object-contain mix-blend-multiply hover:scale-105 transition-transform" />
@@ -262,7 +251,6 @@ const Orders = () => {
                           </div>
                         </div>
 
-                        {/* 🚀 NEW: Write Review Button (Only shows if Delivered and User is not Admin) */}
                         {!isAdmin && order.status === "Delivered" && (
                           <button 
                             onClick={() => openReviewModal(item)}
@@ -275,7 +263,6 @@ const Orders = () => {
                     )})}
                   </div>
 
-                  {/* Admin Dashboard Context (Shows why it was cancelled) */}
                   {(isAdmin || order.status === "Cancelled") && order.cancelReason && (
                      <div className="bg-red-50 text-red-800 p-4 rounded-xl text-sm font-bold border border-red-200 mt-2">
                        <p className="mb-1">⚠️ Cancellation Reason: <span className="font-normal">{order.cancelReason}</span></p>
@@ -283,7 +270,6 @@ const Orders = () => {
                      </div>
                   )}
 
-                  {/* USER ACTIONS: Buttons Group */}
                   {!isAdmin && (
                     <div className="pt-4 border-t border-gray-100 flex justify-end gap-3">
                       
@@ -320,7 +306,7 @@ const Orders = () => {
         )}
       </div>
 
-      {/* 🚀 NEW: REVIEW MODAL */}
+      {/* REVIEW MODAL */}
       <AnimatePresence>
         {isReviewModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -331,8 +317,6 @@ const Orders = () => {
               <p className="text-gray-500 text-sm mb-6 font-medium line-clamp-1">{reviewItem?.name}</p>
               
               <form onSubmit={handleReviewSubmit} className="space-y-5">
-                
-                {/* Star Rating */}
                 <div>
                   <label className="block text-gray-700 font-bold mb-2 text-sm">Rating</label>
                   <div className="flex gap-2">
@@ -349,7 +333,6 @@ const Orders = () => {
                   </div>
                 </div>
 
-                {/* Name Input */}
                 <div>
                   <label className="block text-gray-700 font-bold mb-2 text-sm">Display Name</label>
                   <input 
@@ -362,7 +345,6 @@ const Orders = () => {
                   />
                 </div>
 
-                {/* Comment Textarea */}
                 <div>
                   <label className="block text-gray-700 font-bold mb-2 text-sm">Review Comment</label>
                   <textarea 

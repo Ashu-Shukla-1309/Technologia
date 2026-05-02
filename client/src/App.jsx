@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster, toast } from 'react-hot-toast';
+import { AuthProvider, useAuth } from './context/AuthContext'; // 🚀 IMPORT CONTEXT
+
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import Home from './pages/Home';
@@ -27,28 +29,64 @@ axios.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
     
-    // If the error is 401 (Unauthorized) and we haven't retried yet
     if (error.response && error.response.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
-      
       try {
-        // Silently hit the refresh endpoint
         await axios.post('/api/auth/refresh');
-        
-        // If successful, retry the exact request the user was trying to make
         return axios(originalRequest);
-        
       } catch (refreshError) {
-        // If refresh token is expired or invalid, log them out completely
         sessionStorage.clear();
         window.location.href = '/login';
         return Promise.reject(refreshError);
       }
     }
-    
     return Promise.reject(error);
   }
 );
+
+// We extract Routes into a sub-component so we can use the useAuth hook inside AuthProvider
+const AppRoutes = ({ products, isLoading, cart, setCart, addToCart, updateQuantity, removeFromCart, isCartOpen, setIsCartOpen, searchTerm, setSearchTerm, fetchProducts }) => {
+  const { isAuthenticated, isAdmin, userRole } = useAuth(); // 🚀 USE CONTEXT
+
+  return (
+    <>
+      <Navbar 
+        cart={cart} 
+        removeFromCart={removeFromCart}
+        updateQuantity={updateQuantity}
+        isOpen={isCartOpen} 
+        setIsOpen={setIsCartOpen}
+        searchTerm={searchTerm} 
+        setSearchTerm={setSearchTerm}
+        clearCart={() => setCart([])}
+      />
+
+      <Routes>
+        <Route path="/" element={
+          <Home 
+            products={products} 
+            isLoading={isLoading}
+            addToCart={addToCart} 
+            fetchProducts={fetchProducts} 
+            searchTerm={searchTerm} 
+            isAdmin={isAdmin} 
+          />
+        } />
+        <Route path="/login" element={<Login />} />
+        <Route path="/signup" element={<Signup />} />
+        <Route path="/verify" element={<VerifyOTP />} />
+        <Route path="/orders" element={<Orders />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/wishlist" element={<Wishlist products={products} addToCart={addToCart} />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/profile" element={isAuthenticated ? <Profile /> : <Navigate to="/login" />} />
+        <Route path="/product/:id" element={<ProductDetails addToCart={addToCart} />} />
+        
+        <Route path="/add" element={(isAdmin || userRole === 'seller') ? <AddProduct fetchProducts={fetchProducts} /> : <Navigate to="/" />} />
+      </Routes>
+    </>
+  );
+};
 
 function App() {
   const [products, setProducts] = useState([]);
@@ -56,9 +94,6 @@ function App() {
   const [cart, setCart] = useState([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [token, setToken] = useState(sessionStorage.getItem('userEmail') ? true : null);
-  const [isAdmin, setIsAdmin] = useState(sessionStorage.getItem('isAdmin') === 'true');
-  const [userRole, setUserRole] = useState(sessionStorage.getItem('userRole') || 'customer');
 
   const fetchProducts = async () => {
     setIsLoading(true);
@@ -76,21 +111,14 @@ function App() {
   useEffect(() => {
     const setupSecurityAndFetch = async () => {
       try {
-        // 1. Fetch the CSRF Token first
         const csrfRes = await axios.get('/api/csrf-token');
-        
-        // 2. Tell Axios to automatically attach it to all future headers
         axios.defaults.headers.common['X-CSRF-Token'] = csrfRes.data.csrfToken;
-        
-        // 3. Proceed to fetch your products
         fetchProducts();
       } catch (err) {
         console.error("Failed to initialize secure session:", err);
-        // Fallback to fetch products anyway in case of network blips
         fetchProducts(); 
       }
     };
-
     setupSecurityAndFetch();
   }, []);
 
@@ -104,7 +132,6 @@ function App() {
       }
       return [...prevCart, { ...product, quantity }];
     });
-    
     toast.success(`${product.name} added to cart!`); 
   };
 
@@ -123,72 +150,31 @@ function App() {
     toast.error("Item removed from cart", { icon: '🗑️' });
   };
 
-  const logout = async () => {
-    try {
-      await axios.post('/api/auth/logout');
-    } catch(e) {
-      console.error(e)
-    }
-    
-    sessionStorage.removeItem('userEmail');
-    sessionStorage.removeItem('isAdmin');
-    sessionStorage.removeItem('userRole'); 
-
-    setToken(null);
-    setIsAdmin(false);
-    setUserRole('customer');
-    toast.success("Logged out successfully");
-    window.location.href = "/";
-  };
-
   return (
-    <BrowserRouter>
-      <Toaster position="bottom-right" toastOptions={{ duration: 3000, style: { borderRadius: '10px', background: '#333', color: '#fff' } }} />
-      
-      <div className="min-h-screen bg-gray-50 flex flex-col font-sans">
-        <Navbar 
-          cart={cart} 
-          removeFromCart={removeFromCart}
-          updateQuantity={updateQuantity}
-          isOpen={isCartOpen} 
-          setIsOpen={setIsCartOpen}
-          searchTerm={searchTerm} 
-          setSearchTerm={setSearchTerm}
-          token={token} 
-          isAdmin={isAdmin} 
-          logout={logout}
-          clearCart={() => setCart([])}
-        />
-
-        <Routes>
-          <Route path="/" element={
-            <Home 
-              products={products} 
-              isLoading={isLoading}
-              addToCart={addToCart} 
-              fetchProducts={fetchProducts} 
-              searchTerm={searchTerm} 
-              isAdmin={isAdmin} 
-            />
-          } />
-          {/* 🚀 NEW: Passed setUserRole to Login */}
-          <Route path="/login" element={<Login setToken={setToken} setIsAdmin={setIsAdmin} setUserRole={setUserRole} />} />
-          <Route path="/signup" element={<Signup />} />
-          <Route path="/verify" element={<VerifyOTP />} />
-          <Route path="/orders" element={<Orders />} />
-          <Route path="/forgot-password" element={<ForgotPassword />} />
-          <Route path="/wishlist" element={<Wishlist products={products} addToCart={addToCart} />} />
-          <Route path="/reset-password" element={<ResetPassword />} />
-          <Route path="/profile" element={token ? <Profile logout={logout} /> : <Navigate to="/login" />} />
-          <Route path="/product/:id" element={<ProductDetails addToCart={addToCart} />} />
+    <AuthProvider>
+      <BrowserRouter>
+        <Toaster position="bottom-right" toastOptions={{ duration: 3000, style: { borderRadius: '10px', background: '#333', color: '#fff' } }} />
+        <div className="min-h-screen bg-gray-50 flex flex-col font-sans">
           
-          {/* 🚀 NEW: Protected route now allows Admins OR Sellers */}
-          <Route path="/add" element={(isAdmin || userRole === 'seller') ? <AddProduct fetchProducts={fetchProducts} /> : <Navigate to="/" />} />
-        </Routes>
+          <AppRoutes 
+            products={products}
+            isLoading={isLoading}
+            cart={cart}
+            setCart={setCart}
+            addToCart={addToCart}
+            updateQuantity={updateQuantity}
+            removeFromCart={removeFromCart}
+            isCartOpen={isCartOpen}
+            setIsCartOpen={setIsCartOpen}
+            searchTerm={searchTerm}
+            setSearchTerm={setSearchTerm}
+            fetchProducts={fetchProducts}
+          />
 
-        <Footer />
-      </div>
-    </BrowserRouter>
+          <Footer />
+        </div>
+      </BrowserRouter>
+    </AuthProvider>
   );
 }
 

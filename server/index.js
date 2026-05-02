@@ -30,14 +30,11 @@ const {
 const app = express();
 
 // 🛡️ SECURITY FIX: Comprehensive Audit Logging
-// Create a logs directory if it doesn't exist
 const logDirectory = path.join(__dirname, 'logs');
 if (!fs.existsSync(logDirectory)) {
     fs.mkdirSync(logDirectory);
 }
-// Create a write stream (in append mode)
 const accessLogStream = fs.createWriteStream(path.join(logDirectory, 'access.log'), { flags: 'a' });
-// Log all requests to the file in the standard Apache combined format
 app.use(morgan('combined', { stream: accessLogStream }));
 
 // 🛡️ Apply all security configs (CORS, Helmet, Rate Limiting, XSS, NoSQL Injection)
@@ -45,12 +42,12 @@ applySecurityMiddleware(app);
 
 app.use(express.json({ limit: '10kb' })); 
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
-app.use(cookieParser()); // Required for reading HTTP-Only cookies
+app.use(cookieParser());
 
 // 🛡️ SECURITY FIX: Apply CSRF protection globally to all routes
 app.use(verifyCsrf);
 
-// 🛡️ SECURITY FIX: Endpoint to provide the CSRF token to the legitimate frontend
+// 🛡️ SECURITY FIX: Endpoint to provide the CSRF token
 app.get('/api/csrf-token', (req, res) => {
     let token = req.cookies['csrfToken'];
     
@@ -65,6 +62,7 @@ app.get('/api/csrf-token', (req, res) => {
     
     res.json({ csrfToken: token });
 });
+
 console.log("Encryption Key Length:", process.env.ENCRYPTION_KEY ? process.env.ENCRYPTION_KEY.length : "MISSING");
 console.log("Starts with quote?", process.env.ENCRYPTION_KEY?.startsWith('"'));
 mongoose.connect(process.env.MONGO_URI)
@@ -111,14 +109,12 @@ const orderSchema = new mongoose.Schema({
   cancelDate: Date      
 });
 
-// Attach encryption before compiling the model
 orderSchema.plugin(mongooseFieldEncryption, { 
     fields: ["phone", "address"], 
     secret: process.env.ENCRYPTION_KEY 
 });
 const Order = mongoose.model('Order', orderSchema);
 
-// --- ENCRYPTED USER SCHEMA ---
 const userSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
@@ -134,19 +130,18 @@ const userSchema = new mongoose.Schema({
   lockUntil: { type: Date, default: null }
 });
 
-// Attach encryption before compiling the model
 userSchema.plugin(mongooseFieldEncryption, { 
     fields: ["phone", "address", "name"], 
     secret: process.env.ENCRYPTION_KEY 
 });
 const User = mongoose.model('User', userSchema);
+
 const Otp = mongoose.model('Otp', new mongoose.Schema({
   email: String,
   code: String,
   createdAt: { type: Date, expires: 300, default: Date.now } 
 }));
 
-// 🛡️ SECURITY FIX: Refresh Token Schema
 const RefreshToken = mongoose.model('RefreshToken', new mongoose.Schema({
   token: String,
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
@@ -237,7 +232,8 @@ app.post('/api/auth/forgot-password', async (req, res) => {
   }
 });
 
-app.post('/api/auth/verify-otp', async (req, res) => {
+// 🛡️ SECURITY FIX 4: Attached otpVerificationLimiter to stop brute-forcing
+app.post('/api/auth/verify-otp', otpVerificationLimiter, async (req, res) => {
   try {
     const { email, otp } = req.body;
     const record = await Otp.findOne({ email });
@@ -256,7 +252,8 @@ app.post('/api/auth/verify-otp', async (req, res) => {
   }
 });
 
-app.post('/api/auth/reset-password', async (req, res) => {
+// 🛡️ SECURITY FIX 4: Attached otpVerificationLimiter to stop brute-forcing
+app.post('/api/auth/reset-password', otpVerificationLimiter, async (req, res) => {
   try {
     const { email, otp, newPassword } = req.body;
     if (!isValidPassword(newPassword)) return res.status(400).json({ error: "Password does not meet security requirements." });
@@ -282,12 +279,6 @@ app.post('/api/auth/login', async (req, res) => {
   try {
     const user = await User.findOne({ email });
     if (!user) return res.status(400).json({ error: "Invalid email or password" }); 
-    
-    // 🛡️ SELF-HEALING ADMIN FIX
-    if (email === process.env.ADMIN_EMAIL && !user.isAdmin) {
-        user.isAdmin = true;
-        await user.save();
-    }
 
     if (user.isBanned) return res.status(403).json({ error: "Your account has been banned by the Administrator." });
 
@@ -307,19 +298,24 @@ app.post('/api/auth/login', async (req, res) => {
         return res.status(400).json({ error: "Invalid email or password" });
     }
     
+    // 🛡️ SECURITY FIX 3: Moved Admin self-healing HERE. 
+    // It only triggers AFTER the password has been correctly verified.
+    if (email === process.env.ADMIN_EMAIL && !user.isAdmin) {
+        user.isAdmin = true;
+        await user.save();
+    }
+
     user.failedLoginAttempts = 0;
     user.lockUntil = null;
     await user.save();
 
-    // 🛡️ SECURITY FIX: 15-Minute Access Token
     const token = jwt.sign({ id: user._id, email: user.email, isAdmin: user.isAdmin, role: user.role }, process.env.JWT_SECRET, { expiresIn: '15m' });
     
-    // 🛡️ SECURITY FIX: 7-Day Refresh Token
     const refreshTokenString = crypto.randomBytes(40).toString('hex');
     const refreshTokenDoc = new RefreshToken({
         token: refreshTokenString,
         user: user._id,
-        expiryDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
+        expiryDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) 
     });
     await refreshTokenDoc.save();
     
@@ -344,7 +340,6 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-// 🛡️ SECURITY FIX: Refresh Token Endpoint
 app.post('/api/auth/refresh', async (req, res) => {
     const requestToken = req.cookies.refreshToken;
     if (!requestToken) return res.status(401).json({ error: "Refresh Token is required!" });
@@ -377,7 +372,6 @@ app.post('/api/auth/logout', async (req, res) => {
     if (refreshToken) {
         await RefreshToken.deleteOne({ token: refreshToken });
     }
-    // 🛡️ Ensure exact matching attributes to clear cross-site cookies
     res.clearCookie('token', { sameSite: 'none', secure: true });
     res.clearCookie('refreshToken', { path: '/api/auth/refresh', sameSite: 'none', secure: true });
     
@@ -489,7 +483,6 @@ app.get('/api/products', async (req, res) => {
   try {
     const products = await Product.find().sort({ _id: -1 }).lean();
     
-    // REMOVED .lean() FROM HERE
     const sellers = await User.find({ role: 'seller' }).select('email name isVerifiedSeller');
     
     const sellerMap = {};
@@ -512,8 +505,6 @@ app.get('/api/products/:id', async (req, res) => {
     if (!product) return res.status(404).json({ error: "Product not found" });
     
     if (product.sellerEmail) {
-       // 🛡️ PRIVACY FIX: Only expose the seller's public-facing info
-       // REMOVED .lean() FROM HERE
        const seller = await User.findOne({ email: product.sellerEmail }).select('name email isVerifiedSeller');
        product.seller = seller;
     }
@@ -539,7 +530,11 @@ app.put('/api/products/:id', authenticateToken, verifySellerOrAdmin, async (req,
       return res.status(403).json({ error: "You can only edit your own products." });
     }
 
-    const updatedProduct = await Product.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    // 🛡️ SECURITY FIX 2: Prevent Mass Assignment / IDOR by explicitly extracting only safe fields.
+    const { name, price, image, category, description, inStock } = req.body;
+    const safeUpdateData = { name, price, image, category, description, inStock };
+
+    const updatedProduct = await Product.findByIdAndUpdate(req.params.id, safeUpdateData, { new: true });
     res.json(updatedProduct);
   } catch (err) { res.status(500).json({ error: "Failed to update product" }); }
 });
@@ -564,13 +559,11 @@ app.post('/api/products/:id/reviews', authenticateToken, async (req, res) => {
     const userEmail = req.user.email;
     const productId = req.params.id;
 
-    // 🛡️ THE FINAL FIX: Search for the product by its '_id' inside the items array
     const hasBought = await Order.findOne({ 
-      email: { $regex: new RegExp(`^${userEmail}$`, 'i') }, // Case-insensitive email
+      email: { $regex: new RegExp(`^${userEmail}$`, 'i') }, 
       status: "Delivered",
       "items": { 
         $elemMatch: { 
-          // Checks for both String and ObjectId versions of the ID
           _id: { $in: [productId, new mongoose.Types.ObjectId(productId)] } 
         } 
       }
@@ -605,14 +598,18 @@ app.post('/api/orders', authenticateToken, async (req, res) => {
     const { customerName, phone, address, items, paymentMethod, transactionId } = req.body;
     
     const secureItems = [];
-    let secureTotalPaise = 0; // 🛡️ SECURITY FIX: Integer math for money
+    let secureTotalPaise = 0; 
 
     for (let item of items) {
       const product = await Product.findById(item._id);
       if (product) {
         const qty = item.quantity || 1;
         
-        // Convert to integers (paise/cents) to prevent floating-point errors
+        // 🛡️ SECURITY FIX 1: Prevent Negative Quantity Exploit
+        if (!Number.isInteger(qty) || qty <= 0) {
+            return res.status(400).json({ error: "Invalid item quantity." });
+        }
+        
         const priceInPaise = Math.round(product.price * 100);
         secureTotalPaise += priceInPaise * qty;
 
@@ -620,7 +617,6 @@ app.post('/api/orders', authenticateToken, async (req, res) => {
       }
     }
     
-    // Convert back to standard currency format
     const secureTotal = secureTotalPaise / 100;
 
     const newOrder = new Order({ email: req.user.email, customerName, phone, address, items: secureItems, total: secureTotal, paymentMethod, transactionId });
@@ -665,6 +661,11 @@ app.post('/api/orders/:id/cancel', authenticateToken, async (req, res) => {
         if (!order) return res.status(404).json({ error: "Order record not found" });
         if (order.status === "Cancelled") return res.status(400).json({ error: "Order is already cancelled" });
         if (order.email !== req.user.email && !req.user.isAdmin) return res.status(403).json({ error: "Unauthorized" });
+
+        // 🛡️ SECURITY FIX 5: Prevent cancellation of orders that have already been shipped/delivered
+        if (order.status !== "Processing") {
+            return res.status(400).json({ error: "Order cannot be cancelled at this stage." });
+        }
 
         order.status = "Cancelled";
         order.cancelReason = reason;

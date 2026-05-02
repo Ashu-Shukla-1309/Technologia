@@ -1,45 +1,46 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { toast } from 'react-hot-toast';
+import { useAuth } from '../context/AuthContext'; // 🚀 IMPORT CONTEXT
 
-const Profile = ({ logout }) => {
+const Profile = () => {
   const [orders, setOrders] = useState([]);
   const [profile, setProfile] = useState({ name: '', phone: '', address: '', email: '', role: 'customer', isVerifiedSeller: false });
   const [isEditing, setIsEditing] = useState(false);
-  const email = localStorage.getItem('userEmail');
-  const token = localStorage.getItem('token');
+  
+  const { userEmail, logout } = useAuth(); // 🚀 PULL FROM CONTEXT
 
   useEffect(() => {
     window.scrollTo(0, 0);
 
     const fetchProfileData = async () => {
       try {
-        const authConfig = { headers: { Authorization: `Bearer ${token}` } };
+        // 🚀 NO MANUAL HEADERS REQUIRED
         const [ordersRes, profileRes] = await Promise.all([
-          axios.get(`${import.meta.env.VITE_API_URL}/api/orders`, authConfig),
-          axios.get(`${import.meta.env.VITE_API_URL}/api/users/me`, authConfig)
+          axios.get(`${import.meta.env.VITE_API_URL}/api/orders`),
+          axios.get(`${import.meta.env.VITE_API_URL}/api/users/me`)
         ]);
         setOrders(ordersRes.data);
         if (profileRes.data) setProfile(profileRes.data);
       } catch (err) { console.error("Failed to load profile data", err); }
     };
     fetchProfileData();
-  }, [token]);
+  }, []);
 
   const handleSaveProfile = async () => {
     const phoneRegex = /^\+?[1-9]\d{9,14}$/;
     
     if (!profile.name?.trim()) return toast.error("Full Name is required.");
     if (!phoneRegex.test(profile.phone)) return toast.error("Please enter a valid phone number.");
-    if (!profile.address?.trim()) return toast.error("Complete Address is required."); // 👈 NEW Validation
+    if (!profile.address?.trim()) return toast.error("Complete Address is required."); 
 
     try {
-      const authConfig = { headers: { Authorization: `Bearer ${token}` } };
+      // 🚀 NO MANUAL HEADERS REQUIRED
       const res = await axios.put(`${import.meta.env.VITE_API_URL}/api/users/me`, {
         name: profile.name,
         phone: profile.phone,
-        address: profile.address // 👈 NEW: Send address to backend
-      }, authConfig);
+        address: profile.address 
+      });
       
       setProfile(res.data);
       setIsEditing(false);
@@ -51,7 +52,6 @@ const Profile = ({ logout }) => {
     <div className="min-h-screen bg-gray-50 text-gray-900 p-6 md:p-12">
       <div className="max-w-6xl mx-auto">
         
-        {/* 🚀 UPDATED WARNING: Checks for Address too */}
         {profile.role === 'seller' && (!profile.name || !profile.phone || !profile.address) && (
           <div className="bg-orange-100 border-l-4 border-orange-500 text-orange-800 p-4 mb-8 rounded-r-xl shadow-sm flex items-center gap-4">
             <span className="text-2xl">⚠️</span>
@@ -66,7 +66,7 @@ const Profile = ({ logout }) => {
           <div>
             <h1 className="text-4xl md:text-5xl font-black uppercase tracking-tight">Your Hub</h1>
             <div className="flex items-center gap-3 mt-2">
-              <p className="text-blue-600 font-mono font-bold">{profile.email || email}</p>
+              <p className="text-blue-600 font-mono font-bold">{profile.email || userEmail}</p>
               {profile.role === 'seller' && (
                 <span className={`px-3 py-1 rounded-full text-xs font-bold border ${profile.isVerifiedSeller ? 'bg-green-100 text-green-700 border-green-300' : 'bg-yellow-100 text-yellow-700 border-yellow-300'}`}>
                   {profile.isVerifiedSeller ? '✅ Verified Seller' : '⏳ Pending Verification'}
@@ -110,7 +110,6 @@ const Profile = ({ logout }) => {
               </div>
             </div>
             
-            {/* 🚀 NEW: Address Field Block */}
             <div className="border-t border-gray-100 pt-6">
               <label className="block text-xs text-gray-400 font-bold uppercase mb-1">Complete Business/Home Address</label>
               {isEditing ? (

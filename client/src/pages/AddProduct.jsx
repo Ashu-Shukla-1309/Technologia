@@ -3,6 +3,7 @@ import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-hot-toast';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext'; // 🚀 IMPORT CONTEXT
 
 const AddProduct = ({ fetchProducts }) => {
   const [formData, setFormData] = useState({ name: '', price: '', category: 'Electronics', image: '', description: '', inStock: true });
@@ -11,31 +12,28 @@ const AddProduct = ({ fetchProducts }) => {
   const [sellers, setSellers] = useState([]); 
   const [currentUser, setCurrentUser] = useState(null); 
   const [editingId, setEditingId] = useState(null); 
-
-  // 🚀 NEW: Admin Action Modal State
   const [actionModal, setActionModal] = useState({ isOpen: false, type: '', seller: null, reason: '' });
 
-  const token = sessionStorage.getItem('userEmail') ? true : null;
-  const userEmail = sessionStorage.getItem('userEmail');
-  const isAdmin = sessionStorage.getItem('isAdmin') === 'true';
-  const authConfig = { headers: { Authorization: `Bearer ${token}` } };
+  const { isAdmin, userEmail } = useAuth(); // 🚀 PULL FROM CONTEXT
 
   useEffect(() => { 
     refreshInventory(); 
     fetchOrders(); 
     fetchCurrentUser();
     if (isAdmin) fetchSellers(); 
-  }, []);
+  }, [isAdmin]);
 
   const fetchCurrentUser = async () => {
     try {
-      const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/users/me`, authConfig);
+      // 🚀 NO MANUAL HEADERS
+      const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/users/me`);
       setCurrentUser(res.data);
     } catch (err) { console.error("Failed to load user info"); }
   };
 
   const refreshInventory = async () => {
     try {
+      // 🚀 NO MANUAL HEADERS
       const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/products`);
       setProducts(Array.isArray(res.data) ? res.data : []);
     } catch (err) { setProducts([]); }
@@ -43,14 +41,16 @@ const AddProduct = ({ fetchProducts }) => {
 
   const fetchOrders = async () => {
     try {
-      const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/orders`, authConfig);
+      // 🚀 NO MANUAL HEADERS
+      const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/orders`);
       setOrders(res.data);
     } catch (err) { console.error(err); }
   };
 
   const fetchSellers = async () => {
     try {
-      const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/users/sellers`, authConfig);
+      // 🚀 NO MANUAL HEADERS
+      const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/users/sellers`);
       setSellers(res.data);
     } catch (err) { console.error("Failed to load sellers"); }
   };
@@ -65,10 +65,12 @@ const AddProduct = ({ fetchProducts }) => {
     const loadingToast = toast.loading(editingId ? "Updating product..." : "Adding to store...");
     try {
       if (editingId) {
-        await axios.put(`${import.meta.env.VITE_API_URL}/api/products/${editingId}`, formData, authConfig);
+        // 🚀 NO MANUAL HEADERS
+        await axios.put(`${import.meta.env.VITE_API_URL}/api/products/${editingId}`, formData);
         toast.success('Product Updated Successfully!', { id: loadingToast });
       } else {
-        await axios.post(`${import.meta.env.VITE_API_URL}/api/products`, formData, authConfig);
+        // 🚀 NO MANUAL HEADERS
+        await axios.post(`${import.meta.env.VITE_API_URL}/api/products`, formData);
         toast.success('Product Added Successfully!', { id: loadingToast });
       }
       resetForm();
@@ -91,7 +93,8 @@ const AddProduct = ({ fetchProducts }) => {
   const handleToggleStock = async (product) => {
     try {
       const updatedStock = !product.inStock;
-      await axios.put(`${import.meta.env.VITE_API_URL}/api/products/${product._id}`, { ...product, inStock: updatedStock }, authConfig);
+      // 🚀 NO MANUAL HEADERS
+      await axios.put(`${import.meta.env.VITE_API_URL}/api/products/${product._id}`, { ...product, inStock: updatedStock });
       toast.success(updatedStock ? "Item marked In Stock" : "Item marked Out of Stock");
       refreshInventory();
       fetchProducts();
@@ -101,7 +104,8 @@ const AddProduct = ({ fetchProducts }) => {
   const handleDelete = async (id) => {
     if (window.confirm("Are you sure you want to delete this product?")) {
       try {
-        await axios.delete(`${import.meta.env.VITE_API_URL}/api/products/${id}`, authConfig);
+        // 🚀 NO MANUAL HEADERS
+        await axios.delete(`${import.meta.env.VITE_API_URL}/api/products/${id}`);
         if (editingId === id) resetForm(); 
         toast.success("Product deleted");
         refreshInventory(); 
@@ -110,18 +114,17 @@ const AddProduct = ({ fetchProducts }) => {
     }
   };
 
-  // 🛡️ ADMIN: Toggle Verification (No reason needed for this one)
   const handleToggleVerification = async (sellerId, currentStatus) => {
     try {
+      // 🚀 NO MANUAL HEADERS
       await axios.put(`${import.meta.env.VITE_API_URL}/api/users/${sellerId}/verify-seller`, {
         isVerifiedSeller: !currentStatus
-      }, authConfig);
+      });
       toast.success(!currentStatus ? "Seller Verified!" : "Seller Verification Revoked");
       fetchSellers(); 
     } catch (err) { toast.error("Failed to update seller verification"); }
   };
 
-  // 🚀 ADMIN: Execute Ban or Delete AFTER reason is provided
   const executeAdminAction = async (e) => {
     e.preventDefault();
     const { type, seller, reason } = actionModal;
@@ -130,15 +133,15 @@ const AddProduct = ({ fetchProducts }) => {
     const loadingToast = toast.loading(`Executing ${type}...`);
     try {
       if (type === 'ban') {
-        await axios.put(`${import.meta.env.VITE_API_URL}/api/users/${seller._id}/ban`, { isBanned: true, reason }, authConfig);
+        // 🚀 NO MANUAL HEADERS
+        await axios.put(`${import.meta.env.VITE_API_URL}/api/users/${seller._id}/ban`, { isBanned: true, reason });
         toast.success(`${seller.name} has been banned.`, { id: loadingToast });
       } else if (type === 'unban') {
-        await axios.put(`${import.meta.env.VITE_API_URL}/api/users/${seller._id}/ban`, { isBanned: false, reason: "Restored" }, authConfig);
+        await axios.put(`${import.meta.env.VITE_API_URL}/api/users/${seller._id}/ban`, { isBanned: false, reason: "Restored" });
         toast.success(`${seller.name} has been restored.`, { id: loadingToast });
       } else if (type === 'delete') {
         await axios.delete(`${import.meta.env.VITE_API_URL}/api/users/${seller._id}`, { 
-          headers: authConfig.headers, 
-          data: { reason } // axios.delete requires body to be inside a 'data' object
+          data: { reason } 
         });
         toast.success(`${seller.name} has been permanently deleted.`, { id: loadingToast });
       }
@@ -166,7 +169,6 @@ const AddProduct = ({ fetchProducts }) => {
     <div className="min-h-screen bg-gray-50 text-gray-900 p-6 md:p-12 font-sans relative">
       <div className="max-w-6xl mx-auto">
         
-        {/* ADMIN ANALYTICS DASHBOARD */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-white p-6 rounded-3xl border border-gray-200 shadow-sm flex flex-col justify-center items-start">
             <p className="text-gray-500 font-bold text-sm uppercase tracking-wider mb-2">Total Sales</p>
@@ -182,7 +184,6 @@ const AddProduct = ({ fetchProducts }) => {
           </motion.div>
         </div>
 
-        {/* 🛡️ SELLER MANAGEMENT PANEL */}
         {isAdmin && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-white p-8 rounded-3xl border border-gray-200 shadow-sm mb-12">
             <h2 className="text-2xl font-black mb-6 text-gray-900 uppercase tracking-tighter">Manage Sellers</h2>
@@ -337,7 +338,6 @@ const AddProduct = ({ fetchProducts }) => {
         </div>
       </div>
 
-      {/* 🚀 ADMIN REASON PROMPT MODAL */}
       <AnimatePresence>
         {actionModal.isOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">

@@ -1,28 +1,21 @@
-
 import { useState } from 'react';
 import axios from 'axios';
 import { useNavigate, Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext'; // 🚀 IMPORT CONTEXT
 
-const LoginTemp = ({ setToken, setIsAdmin, setUserRole }) => {
+const LoginTemp = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const navigate = useNavigate();
+  const { login } = useAuth(); // 🚀 USE CONTEXT
 
   const handleLogin = async (e) => {
     e.preventDefault();
     try {
       const res = await axios.post(`/api/auth/login`, { email, password });
       
-      // 🛡️ SECURITY FIX: Do not store token in storage. Backend handles HTTP-Only cookie.
-      // 🛡️ SECURITY FIX: Use sessionStorage so it clears when browser closes
-      sessionStorage.setItem('isAdmin', res.data.isAdmin);
-      sessionStorage.setItem('userEmail', res.data.email); 
-      sessionStorage.setItem('userRole', res.data.role); 
-      
-      // We set token state to 'true' just so the app knows we are logged in
-      setToken(true); 
-      setIsAdmin(res.data.isAdmin);
-      setUserRole(res.data.role); 
+      // 🚀 Pass data directly to context to handle state
+      login(res.data);
       
       navigate('/');
     } catch (err) {
