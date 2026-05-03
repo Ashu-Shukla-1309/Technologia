@@ -471,6 +471,21 @@ app.put('/api/users/:id/verify-seller', authenticateToken, verifyAdmin, async (r
   try {
     const { isVerifiedSeller } = req.body;
     const user = await User.findByIdAndUpdate(req.params.id, { isVerifiedSeller }, { new: true }).select('-password');
+    
+    // 🚀 NEW: Notify Seller of Verification Change
+    if (user) {
+        const statusText = isVerifiedSeller ? "VERIFIED" : "REVOKED";
+        const msg = isVerifiedSeller 
+            ? "Congratulations! Your seller account has been verified. You can now list products in the inventory." 
+            : "Your seller verification status has been revoked. Please contact support.";
+            
+        sendEmail({
+            to: user.email,
+            subject: `Technologia: Seller Status ${statusText}`,
+            html: `<h3>Seller Verification Update</h3><p>${msg}</p>`
+        }, "SELLER VERIFICATION");
+    }
+
     res.json(user);
   } catch (err) { res.status(500).json({ error: "Failed to update seller status" }); }
 });
@@ -621,6 +636,37 @@ app.post('/api/orders', authenticateToken, async (req, res) => {
 
     const newOrder = new Order({ email: req.user.email, customerName, phone, address, items: secureItems, total: secureTotal, paymentMethod, transactionId });
     await newOrder.save();
+
+    // 🚀 NEW: Notify Admin of New Order (with Transaction Details)
+    const adminEmail = process.env.ADMIN_EMAIL;
+    if (adminEmail) {
+        // Declared ONLY ONCE to prevent a fatal crash
+        const itemsHtml = secureItems.map(i => `<li>${i.quantity}x ${i.name} (₹${i.price})</li>`).join('');
+        
+        sendEmail({
+            to: adminEmail,
+            subject: `🚨 New Order Received: #${newOrder._id.toString().slice(-6).toUpperCase()}`,
+            html: `
+                <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #e5e7eb; border-radius: 10px;">
+                    <h2 style="color: #2563eb; margin-top: 0;">New Order Placed!</h2>
+                    <p><strong>Customer:</strong> ${customerName} (${req.user.email})</p>
+                    <p><strong>Phone:</strong> ${phone}</p>
+                    <p><strong>Shipping Address:</strong> ${address}</p>
+                    
+                    <div style="background-color: #f8fafc; padding: 15px; border-left: 4px solid #3b82f6; margin: 20px 0;">
+                        <p style="margin: 0 0 5px 0;"><strong>Payment Method:</strong> ${paymentMethod}</p>
+                        <p style="margin: 0; color: #dc2626;"><strong>Transaction Details:</strong> ${transactionId}</p>
+                    </div>
+
+                    <h3 style="color: #16a34a; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px;">Total Paid: ₹${secureTotal}</h3>
+                    
+                    <h4 style="margin-bottom: 5px;">Items Ordered:</h4>
+                    <ul style="margin-top: 0; color: #4b5563;">${itemsHtml}</ul>
+                </div>
+            `
+        }, "ADMIN NEW ORDER");
+    }
+
     res.json(newOrder);
   } catch (err) { res.status(500).json({ error: "Failed to process order" }); }
 });
@@ -635,6 +681,24 @@ app.get('/api/orders', authenticateToken, async (req, res) => {
 app.put('/api/orders/:id/status', authenticateToken, verifyAdmin, async (req, res) => {
   try {
     const updatedOrder = await Order.findByIdAndUpdate(req.params.id, { status: req.body.status }, { new: true });
+    
+    // 🚀 NEW: Notify Customer of Status Change
+    if (updatedOrder) {
+        sendEmail({
+            to: updatedOrder.email,
+            subject: `📦 Technologia Order Update: ${req.body.status}`,
+            html: `
+                <div style="font-family: Arial; padding: 20px;">
+                    <h2>Order Status Update</h2>
+                    <p>Your order <strong>#${updatedOrder._id.toString().slice(-6).toUpperCase()}</strong> has been updated.</p>
+                    <p style="padding: 15px; background: #f0fdf4; border-left: 4px solid #16a34a; font-size: 18px;">
+                        Current Status: <strong>${req.body.status}</strong>
+                    </p>
+                </div>
+            `
+        }, "CUSTOMER ORDER STATUS");
+    }
+
     res.json(updatedOrder);
   } catch (err) { res.status(500).json({ error: "Failed to update status" }); }
 });
@@ -649,6 +713,16 @@ app.post('/api/orders/:id/return', authenticateToken, async (req, res) => {
 
     order.status = `Return Requested (${type})`;
     await order.save();
+    
+    // 🚀 NEW: Alert Admin to Return Request
+    if (process.env.ADMIN_EMAIL) {
+        sendEmail({
+            to: process.env.ADMIN_EMAIL,
+            subject: `⚠️ ${type} Request: Order #${order._id.toString().slice(-6).toUpperCase()}`,
+            html: `<h3>New ${type} Request</h3><p><strong>Customer:</strong> ${order.email}</p><p><strong>Reason:</strong> ${reason}</p>`
+        }, "ADMIN RETURN ALERT");
+    }
+
     res.json({ message: "Return request sent successfully", order });
   } catch (err) { res.status(500).json({ error: "Failed to process return request" }); }
 });
@@ -671,6 +745,16 @@ app.post('/api/orders/:id/cancel', authenticateToken, async (req, res) => {
         order.cancelReason = reason;
         order.cancelDate = new Date();
         await order.save();
+
+        // 🚀 NEW: Alert Admin to Cancellation
+        if (process.env.ADMIN_EMAIL) {
+            sendEmail({
+                to: process.env.ADMIN_EMAIL,
+                subject: `❌ Order Cancelled: #${order._id.toString().slice(-6).toUpperCase()}`,
+                html: `<h3>Customer Cancelled Order</h3><p><strong>Customer:</strong> ${order.email}</p><p><strong>Reason provided:</strong> ${reason}</p>`
+            }, "ADMIN CANCEL ALERT");
+        }
+
         res.json({ message: "Order successfully cancelled", order });
     } catch (err) { res.status(500).json({ error: "Failed to cancel order" }); }
 });

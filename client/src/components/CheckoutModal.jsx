@@ -83,14 +83,29 @@ const CheckoutModal = ({ isOpen, onClose, onFinalSuccess, onSubmit, cart, total 
 
     const addr = addresses.find(a => a.id === selectedAddressId);
     const fullAddress = `${addr.address}, ${addr.city}, ${addr.zip}`;
-    const userEmail = localStorage.getItem('userEmail') || "Guest";
+    const userEmail = sessionStorage.getItem('userEmail') || "Guest";
     
-    const orderData = {
-      email: userEmail, customerName: addr.name, phone: addr.phone, address: fullAddress, 
-      items: cart, total: grandTotal, paymentMethod: paymentMethod,
-      transactionId: paymentMethod === 'UPI' ? paymentDetails.upiId : 'N/A'
-    };
+    // 🛡️ SECURITY & FEATURE FIX: Format secure payment details for the admin
+    let safeTxDetails = 'N/A';
+    if (paymentMethod === 'UPI') {
+        safeTxDetails = `UPI UTR: ${paymentDetails.upiId}`;
+    } else if (paymentMethod === 'Card') {
+        // ONLY send the last 4 digits. Never send the full card number or CVV!
+        safeTxDetails = `Card ending in XXXX-XXXX-XXXX-${paymentDetails.cardNumber.slice(-4)}`;
+    } else {
+        safeTxDetails = 'Pending (Cash on Delivery)';
+    }
 
+    const orderData = {
+      email: userEmail, 
+      customerName: addr.name, 
+      phone: addr.phone, 
+      address: fullAddress, 
+      items: cart, 
+      total: grandTotal, 
+      paymentMethod: paymentMethod,
+      transactionId: safeTxDetails // Passes the securely formatted string to the backend
+    };
     try {
       await onSubmit(orderData); 
       setIsSuccess(true);
