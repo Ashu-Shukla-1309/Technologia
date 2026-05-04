@@ -66,8 +66,21 @@ const applySecurityMiddleware = (app) => {
     app.use(require('cors')(corsOptions));
 
     // Security Headers
+    // Enhanced Security Headers via Helmet
     app.use(helmet({
-        crossOriginResourcePolicy: { policy: "cross-origin" }
+        contentSecurityPolicy: {
+            directives: {
+                defaultSrc: ["'self'"],
+                scriptSrc: ["'self'", "'unsafe-inline'"],
+                styleSrc: ["'self'", "'unsafe-inline'"],
+                imgSrc: ["'self'", "data:", "https:"],
+                connectSrc: ["'self'", "https://api.brevo.com"] // Allow your email API
+            }
+        },
+        crossOriginResourcePolicy: { policy: "cross-origin" },
+        referrerPolicy: { policy: "strict-origin-when-cross-origin" },
+        xContentTypeOptions: true,
+        xFrameOptions: { action: "sameorigin" }
     }));
     
     // 🛡️ Combined NoSQL Injection & XSS In-Place Sanitizer (Express 5 Compatible)
