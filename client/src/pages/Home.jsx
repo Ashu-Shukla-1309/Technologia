@@ -79,7 +79,8 @@ const Home = ({ products = [], isLoading, addToCart, searchTerm }) => {
     <div className="bg-slate-50 min-h-screen text-gray-900 font-sans overflow-x-hidden">
       
       {/* 🚀 COMPACT HERO SECTION */}
-      <section className="relative h-[500px] md:h-[700px] flex items-center justify-center overflow-hidden bg-gradient-to-br from-blue-900 via-indigo-900 to-blue-950">
+      {/* FIX APPLIED HERE: min-h-screen and py-20 for mobile, fixed height for desktop */}
+      <section className="relative min-h-screen lg:min-h-0 lg:h-[700px] py-20 lg:py-0 flex items-center justify-center overflow-hidden bg-gradient-to-br from-blue-900 via-indigo-900 to-blue-950">
         <div className="absolute inset-0 z-0 overflow-hidden">
           <motion.div animate={{ scale: [1, 1.2, 1], x: [0, 80, 0], y: [0, -40, 0] }} transition={{ duration: 15, repeat: Infinity, ease: "easeInOut" }} className="absolute top-[-10%] left-[-10%] w-[10000px] h-[1000px] bg-blue-500/30 blur-[100px] rounded-full" />
           <motion.div animate={{ scale: [1.2, 1, 1.2], x: [0, -80, 0], y: [0, 80, 0] }} transition={{ duration: 20, repeat: Infinity, ease: "easeInOut" }} className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-cyan-400/20 blur-[100px] rounded-full" />
@@ -107,7 +108,7 @@ const Home = ({ products = [], isLoading, addToCart, searchTerm }) => {
             </motion.div>
           </div>
 
-          <div className="hidden lg:flex justify-center items-center relative h-[400px] w-full">
+          <div className="flex justify-center items-center relative h-[300px] lg:h-[400px] w-full mt-10 lg:mt-0">
             <div className="absolute w-[350px] h-[350px] bg-blue-300/10 blur-[50px] rounded-full z-0" />
             <motion.div className="relative z-20 w-full max-w-md flex justify-center items-center h-[350px]">
               <AnimatePresence mode="wait">
