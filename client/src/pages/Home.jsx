@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-hot-toast';
-import { Link } from 'react-router-dom'; // 🚀 NEW: Imported Link for navigation
+import { Link } from 'react-router-dom';
 
 const Home = ({ products = [], isLoading, addToCart, searchTerm }) => {
   const [index, setIndex] = useState(0);
@@ -111,7 +111,17 @@ const Home = ({ products = [], isLoading, addToCart, searchTerm }) => {
             <div className="absolute w-[350px] h-[350px] bg-blue-300/10 blur-[50px] rounded-full z-0" />
             <motion.div className="relative z-20 w-full max-w-md flex justify-center items-center h-[350px]">
               <AnimatePresence mode="wait">
-                <motion.img key={index} src={bannerImages[index]} alt={words[index]} className="absolute w-[100%] h-[100%] object-contain drop-shadow-[0_15px_30px_rgba(0,0,0,0.5)]" initial={{ opacity: 0, x: 80, scale: 0.9 }} animate={{ opacity: 1, x: 0, scale: 1.1 }} exit={{ opacity: 0, x: -80, scale: 0.9 }} transition={{ duration: 0.7, ease: [0.25, 0.1, 0.25, 1] }}/>
+                <motion.img 
+                  key={index} 
+                  src={bannerImages[index]} 
+                  alt={words[index]} 
+                  /* 🚀 Added mobile-gpu-fix here to prevent mobile flickering */
+                  className="absolute w-[100%] h-[100%] object-contain drop-shadow-[0_15px_30px_rgba(0,0,0,0.5)] mobile-gpu-fix" 
+                  initial={{ opacity: 0, x: 80, scale: 0.9 }} 
+                  animate={{ opacity: 1, x: 0, scale: 1.1 }} 
+                  exit={{ opacity: 0, x: -80, scale: 0.9 }} 
+                  transition={{ duration: 0.7, ease: [0.25, 0.1, 0.25, 1] }}
+                />
               </AnimatePresence>
             </motion.div>
           </div>
@@ -192,7 +202,6 @@ const Home = ({ products = [], isLoading, addToCart, searchTerm }) => {
                     {isWishlisted ? '❤️' : '🤍'}
                   </button>
 
-                  {/* 🚀 NEW: Clickable Image wrapping Link */}
                   <Link to={`/product/${product._id}`} className="block h-64 flex items-center justify-center mb-6 bg-slate-50 rounded-2xl p-4 overflow-hidden border border-slate-100 group relative">
                     <motion.img 
                       whileHover={{ scale: 1.1 }} 
@@ -206,7 +215,6 @@ const Home = ({ products = [], isLoading, addToCart, searchTerm }) => {
                   <div className="px-2 pb-2 flex-1 flex flex-col">
                     <p className="text-xs text-blue-600 font-bold uppercase tracking-wider mb-2">{product.category}</p>
                     
-                    {/* 🚀 NEW: Clickable Title wrapping Link */}
                     <Link to={`/product/${product._id}`}>
                       <h3 className="font-bold text-xl text-gray-900 mb-1 line-clamp-2 leading-tight hover:text-blue-600 transition-colors">{product.name}</h3>
                     </Link>

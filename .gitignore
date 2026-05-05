@@ -22,3 +22,4 @@ client/dist/
 # --- SYSTEM FILES ---
 .DS_Store
 Thumbs.db
+server/logs/
